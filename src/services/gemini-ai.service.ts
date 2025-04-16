@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { createPartFromUri, GoogleGenAI, Type } from '@google/genai';
+import { createPartFromUri, GoogleGenAI, Part, Type } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
 import fetch from 'node-fetch';
+import { GeminiModelService } from './gemini-model.service';
 
 @Injectable()
 export class GeminiAiService {
   private ai: GoogleGenAI;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService, private geminiModelService: GeminiModelService) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY not found in environment variables');
@@ -22,51 +23,106 @@ export class GeminiAiService {
    * @returns Processed file object
    */
   async uploadRemotePDF(url: string, displayName: string) {
-    const response = await fetch(url);
-    const pdfBuffer = await response.arrayBuffer();
+    try {
+      console.log(`[INFO] Fetching PDF from: ${url}`);
+      
+      // Set proper headers for PDF file download
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+          'User-Agent': 'Mozilla/5.0 (compatible; GreenableAPI/1.0)'
+        },
+        redirect: 'follow' // Follow redirects automatically
+      });
 
-    // Check if the file is too large (50MB limit)
-    const FILE_SIZE_LIMIT = 50 * 1024 * 1024; // 50MB in bytes
-    if (pdfBuffer.byteLength > FILE_SIZE_LIMIT) {
-      console.log(`[WARNING] PDF file is too large (${(pdfBuffer.byteLength / (1024 * 1024)).toFixed(2)}MB). Skipping.`);
-      throw new Error('PDF file is too large to process');
-    }
+      if (!response.ok) {
+        console.error(`[ERROR] Failed to fetch PDF: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+      }
 
-    const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-
-    const file = await this.ai.files.upload({
-      file: fileBlob,
-      config: {
-        displayName,
-      },
-    });
-
-    // Wait for the file to be processed with a timeout
-    let getFile = await this.ai.files.get({ name: file.name });
-    let processingStartTime = Date.now();
-    const maxProcessingTime = 5 * 60 * 1000; // 5 minute timeout for processing
-    
-    while (getFile.state === 'PROCESSING') {
-      // Check if processing has taken too long
-      if (Date.now() - processingStartTime > maxProcessingTime) {
-        console.log(`[TIMEOUT] PDF processing exceeded ${maxProcessingTime/1000} seconds`);
-        throw new Error(`TIMEOUT: PDF processing exceeded ${maxProcessingTime/1000} seconds`);
+      // Check content type
+      const contentType = response.headers.get('content-type');
+      console.log(`[INFO] Content-Type: ${contentType}`);
+      
+      if (!contentType || !contentType.includes('pdf')) {
+        console.warn(`[WARNING] Response does not appear to be a PDF. Content-Type: ${contentType}`);
       }
       
-      // Wait before checking status again
-      await new Promise((resolve) => {
-        setTimeout(resolve, 5000);
+      // Check content length
+      const contentLength = response.headers.get('content-length');
+      console.log(`[INFO] Content-Length: ${contentLength || 'unknown'} bytes`);
+      
+      if (contentLength && parseInt(contentLength, 10) < 1000) {
+        console.warn(`[WARNING] PDF file is suspiciously small (${contentLength} bytes)`);
+      }
+
+      // Download the PDF content
+      const pdfBuffer = await response.arrayBuffer();
+      console.log(`[INFO] Downloaded file size: ${pdfBuffer.byteLength} bytes`);
+
+      // Validate the PDF starts with %PDF
+      const pdfHeader = new Uint8Array(pdfBuffer.slice(0, 5));
+      const isPdf = new TextDecoder().decode(pdfHeader).startsWith('%PDF');
+      
+      if (!isPdf) {
+        console.error('[ERROR] File does not start with %PDF header. Not a valid PDF file.');
+        throw new Error('Not a valid PDF file (missing PDF header)');
+      }
+
+      // Check if the file is too large
+      const FILE_SIZE_LIMIT = 200 * 1024 * 1024; // 200MB in bytes
+      if (pdfBuffer.byteLength > FILE_SIZE_LIMIT) {
+        console.log(`[WARNING] PDF file is too large (${(pdfBuffer.byteLength / (1024 * 1024)).toFixed(2)}MB). Skipping.`);
+        throw new Error('PDF file is too large to process');
+      }
+
+      // Create a Blob with the proper MIME type
+      const fileBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      console.log(`[INFO] Created Blob of size ${fileBlob.size} bytes`);
+
+      // Upload the file to Gemini API
+      console.log('[INFO] Uploading to Gemini API...');
+      const file = await this.ai.files.upload({
+        file: fileBlob,
       });
       
-      getFile = await this.ai.files.get({ name: file.name });
-      console.log(`current file status: ${getFile.state}`);
-    }
-    
-    if (getFile.state === 'FAILED') {
-      throw new Error('File processing failed.');
-    }
+      console.log(`[INFO] File uploaded successfully: ${file.name}`);
 
-    return getFile;
+      // Wait for the file to be processed with a timeout
+      let getFile = await this.ai.files.get({ name: file.name });
+      console.log(`[INFO] Initial file state: ${getFile.state}, size: ${getFile.sizeBytes} bytes`);
+      
+      let processingStartTime = Date.now();
+      const maxProcessingTime = 10 * 60 * 1000; // 10 minute timeout
+      
+      while (getFile.state === 'PROCESSING') {
+        // Check if processing has taken too long
+        if (Date.now() - processingStartTime > maxProcessingTime) {
+          console.log(`[TIMEOUT] PDF processing exceeded ${maxProcessingTime/1000} seconds`);
+          throw new Error(`TIMEOUT: PDF processing exceeded ${maxProcessingTime/1000} seconds`);
+        }
+
+        getFile = await this.ai.files.get({ name: file.name });
+        
+        // Wait before checking status again
+        await new Promise((resolve) => {
+          setTimeout(resolve, 5000);
+        });
+        
+        console.log(`[INFO] Current file status: ${getFile.state}`);
+      }
+      
+      if (getFile.state === 'FAILED') {
+        console.error('[ERROR] File processing failed.');
+        throw new Error('File processing failed.');
+      }
+
+      return getFile;
+    } catch (error) {
+      console.error('[ERROR] PDF upload/processing failed:', error);
+      throw error;
+    }
   }
   
   /**
@@ -78,22 +134,30 @@ export class GeminiAiService {
   async processPDF(
     url: string,
     prompt = 'Summarize this document',
-    modelName = 'gemini-2.0-flash'
+    modelType = 'esg'
   ): Promise<any> {
     try {
-      const content = [prompt];
+      console.log(`[DEBUG] Processing PDF: ${url}`);
+      const content: (string | Part)[] = [prompt];
 
       // Upload and process PDF
       const file = await this.uploadRemotePDF(url, "Document");
-      if (file.uri && file.mimeType) {
-        const fileContent = createPartFromUri(file.uri, file.mimeType);
-        // @ts-ignore
-        content.push(fileContent);
+      
+      if (!file || !file.uri || !file.mimeType) {
+        throw new Error('Invalid file response from PDF upload');
       }
+      
+      console.log(`[DEBUG] File URI: ${file.uri}, MIME Type: ${file.mimeType}, Size: ${file.sizeBytes} bytes`);
+      
+      const fileContent = createPartFromUri(file.uri, file.mimeType);
+      console.log(fileContent);
+      content.push(fileContent);
+
+      const model = this.geminiModelService.getModel(modelType);
+      console.log('[DEBUG] Generating content with model...');
 
       // Generate content with the PDF
-      const response = await this.ai.models.generateContent({
-        model: modelName,
+      const response = await model.generateContent({
         contents: content,
         config: {
           temperature: 0.1,

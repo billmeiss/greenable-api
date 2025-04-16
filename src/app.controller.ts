@@ -10,19 +10,19 @@ export class AppController {
     return this.appService.processCompanyReports();
   }
 
-  @Get('company/:name')
-  getCompanyReport(@Param('name') companyName: string) {
-    return this.appService.processCompanyReport(companyName);
-  }
-
-  @Get('companies')
-  getCompanies() {
-    return this.appService.getCompanies();
-  }
-
   @Post('/update-revenues')
   updateRevenues() {
     return this.appService.updateRevenues();
+  }
+
+  @Post('/exchange-rates')
+  updateExchangeRates() {
+    return this.appService.updateExchangeRatesForCompanies();
+  }
+
+  @Post('/update-countries')
+  updateCountries() {
+    return this.appService.updateCountries();
   }
 
   @Post('/company') 
@@ -34,10 +34,5 @@ export class AppController {
       name,
       reportUrl
     });
-  }
-
-  @Get('/report-urls')
-  getReportUrls() {
-    return this.appService.getReportUrls();
   }
 }

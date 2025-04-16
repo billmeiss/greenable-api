@@ -5,6 +5,13 @@ import { SearchService } from './search.service';
 import { EmissionsReportService } from './emissions-report.service';
 import axios from 'axios';
 
+// Add type definition for Gemini API response
+interface GeminiResponse {
+  response: {
+    text(): string;
+  };
+}
+
 @Injectable()
 export class ReportFinderService {
   private readonly logger = new Logger(ReportFinderService.name);
@@ -126,12 +133,12 @@ export class ReportFinderService {
         })
       );
       
-      if (!result || !result.response) {
+      if (!result || !result) {
         throw new Error('Failed to generate content from Gemini');
       }
       
       // Parse the response
-      const responseText = result.response.text();
+      const responseText = result.text;
       const parsedResponse = this.geminiApiService.safelyParseJson(responseText);
       
       if (!parsedResponse || !parsedResponse.reportUrl) {
@@ -170,12 +177,12 @@ export class ReportFinderService {
   /**
    * Find a report using Gemini's AI capabilities
    */
-  async findReportWithGemini(
+  async findReportDataWithGemini(
     company: string, 
     targetYear: number, 
     isHistorical = false,
     withEmissions = true
-  ): Promise<{emissions: any, reportUrl: string} | null> {
+  ): Promise<{emissions: any, reportUrl: string | null}> {
     try {
       // Search for reports
       const searchResults = await this.searchForESGReports(company, targetYear, isHistorical);
@@ -349,13 +356,13 @@ export class ReportFinderService {
         })
       );
       
-      if (!result || !result.response) {
+      if (!result || !result) {
         console.log(`[ERROR] Failed to get response from Gemini for ${company} report verification`);
         return reportUrls[0]; // Fall back to first URL
       }
       
       // Parse the response
-      const responseText = result.response.text();
+      const responseText = result.text;
       const parsedResponse = this.geminiApiService.safelyParseJson(responseText);
 
       console.log(parsedResponse)

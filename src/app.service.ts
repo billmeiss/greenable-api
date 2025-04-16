@@ -44,165 +44,43 @@ export class AppService {
     this.logger.log(`Processing report for company: ${name} with provided URL: ${reportUrl}`);
     
     try {
-      
-      // Extract emissions data from the provided report URL
-      const emissionsData = await this.emissionsReportService.getScopedEmissionsFromReport(
-       reportUrl,
-       name
-      );
-      
-      // Check if emissions extraction timed out
-      if (emissionsData && emissionsData.timedOut) {
-        return {
-          success: false,
-          timedOut: true,
-          message: `Emissions extraction timed out after 5 minutes for ${name}`,
-          company: name,
-          parentCompany: null,
-          reportUrl: reportUrl
-        };
-      }
-      
-      // Get revenue data that matches the emissions reporting period
-      const reportingPeriod = emissionsData?.reportingPeriod || null;
-      const revenueData = await this.companyService.getCompanyRevenue(
-        name,
-        reportingPeriod
-      );
-      
-      // Return the results
-      return {
-        success: true,
-        company: name,
-        parentCompany: null,
-        emissions: emissionsData,
-        reportUrl: reportUrl,
-        revenue: revenueData
-      };
+      return await this.reportProcessingService.processCompany(name);
     } catch (error) {
       this.logger.error(`Error processing company ${name}: ${error.message}`);
       return { success: false, message: error.message };
     }
   }
 
-  /**
-   * Get report URLs
-   */
-  async getReportUrls(): Promise<any> {
-    const companies = await this.companyService.getCompaniesFromSheet();
-    const reportUrls = [];
+  async updateExchangeRatesForCompanies(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    // If exchange rate is not USD, convert the revenue to USD
     for (const company of companies) {
-      const { reportUrl } = await this.processCompanyReport(company, false);
-      if (reportUrl) {
-        await this.companyService.addCompanyReportUrlToSheet(company, reportUrl);
-        reportUrls.push({ company, reportUrl });
+      const { name, reportingPeriod, revenue, revenueYear, exchangeRateCountry } = company;
+      if (exchangeRateCountry === 'USD') {
+        continue;
       }
-    }
-    return reportUrls;
-  }
-
-  
-
-  /**
-   * Process a single company report
-   */
-  async processCompanyReport(company: string, withEmissions: boolean = true): Promise<any> {
-    this.logger.log(`Processing report for company: ${company}`);
-    
-    try {
-      // Find parent company
-      const parentCompany = await this.companyService.findParentCompany(company);
-      
-      // Get ESG report
-      const reportData = await this.reportFinderService.findReportWithGemini(
-        parentCompany || company,
-        new Date().getFullYear(),
-        false,
-        withEmissions
-      );
-
-      console.log({ reportData})
-      
-      if (!reportData) {
-        return { success: false, message: `No report found for ${company}` };
-      }
-      
-      // Check if emissions extraction timed out
-      if (reportData.emissions && reportData.emissions.timedOut) {
-        return {
-          success: false,
-          timedOut: true,
-          message: `Emissions extraction timed out after 5 minutes for ${company}`,
-          company,
-          parentCompany: parentCompany !== company ? parentCompany : null,
-          reportUrl: reportData.reportUrl
-        };
-      }
-      
-      // Get revenue data that matches the emissions reporting period
-      const reportingPeriod = reportData.emissions?.reportingPeriod || null;
-      const revenueData = await this.companyService.getCompanyRevenue(parentCompany || company, reportingPeriod);
-      
-      // Return the results
-      return {
-        success: true,
-        company,
-        parentCompany: parentCompany !== company ? parentCompany : null,
-        emissions: reportData.emissions,
-        reportUrl: reportData.reportUrl,
-        revenue: revenueData
-      };
-    } catch (error) {
-      this.logger.error(`Error processing company ${company}: ${error.message}`);
-      return { success: false, message: error.message };
+      // Look up the exchange rate for the reporting period in rates.json
+      const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
+      console.log(exchangeRate)
+      // Update the revenue with the exchange rate
+      const updatedRevenue = revenue * exchangeRate;
+      // Update the company with the new revenue
+      await this.companyService.updateCompanyRevenue(name, {
+        revenue: updatedRevenue,
+        year: revenueYear,
+        source: 'Exchange Rate',
+        confidence: 1,
+        currency: 'USD'
+      });
     }
   }
 
-  /**
-   * Get companies from the spreadsheet
-   */
-  async getCompanies(): Promise<string[]> {
-    try {
-      return await this.companyService.getCompaniesFromSheet();
-    } catch (error) {
-      this.logger.error(`Error getting companies: ${error.message}`);
-      return [];
-    }
-  }
-
-  /**
-   * Extract emissions data from a report URL
-   */
-  async extractEmissionsData(reportUrl: string, company: string): Promise<any> {
-    try {
-      return await this.emissionsReportService.getScopedEmissionsFromReport(reportUrl, company);
-    } catch (error) {
-      this.logger.error(`Error extracting emissions data: ${error.message}`);
-      return { success: false, message: error.message };
-    }
-  }
-
-  /**
-   * Get parent company
-   */
-  async getParentCompany(company: string): Promise<string> {
-    try {
-      return await this.companyService.findParentCompany(company);
-    } catch (error) {
-      this.logger.error(`Error finding parent company: ${error.message}`);
-      return company;
-    }
-  }
-
-  /**
-   * Get company revenue
-   */
-  async getCompanyRevenue(company: string, reportingPeriod?: string): Promise<any> {
-    try {
-      return await this.companyService.getCompanyRevenue(company, reportingPeriod);
-    } catch (error) {
-      this.logger.error(`Error getting revenue: ${error.message}`);
-      return null;
+  async updateCountries(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    for (const company of companies) {
+      const { name } = company;
+      const { country } = await this.companyService.determineCompanyCountry(name);
+      await this.companyService.updateCompanyCountry(name, country);
     }
   }
 

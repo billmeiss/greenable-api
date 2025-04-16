@@ -1,126 +1,94 @@
 import { Injectable } from '@nestjs/common';
-import { GenerativeModel, GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 @Injectable()
 export class GeminiModelService {
-  private genAI: GoogleGenerativeAI;
-  private models: Record<string, GenerativeModel> = {};
-
+  private modelConfigs: Record<string, any> = {};
+  private ai: GoogleGenAI;
+  
   constructor() {
-    this.genAI = new GoogleGenerativeAI(
-      process.env.GEMINI_API_KEY || 'AIzaSyC7TjgbmLdhHbpQVeAryMYd3joJYh-D2Cc',
-    );
-    this.initializeModels();
+    this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    this.initializeModelConfigs();
   }
 
-  private initializeModels(): void {
+  private initializeModelConfigs(): void {
     // Generic model
-    this.models.generic = this.genAI.getGenerativeModel({
+    this.modelConfigs.generic = {
       model: 'gemini-2.0-flash',
-    });
+    };
 
-    this.models.countryFinder = this.genAI.getGenerativeModel({
+    // Related companies model
+    this.modelConfigs.relatedCompanies = {
       model: 'gemini-2.0-flash',
       generationConfig: {
         responseMimeType: 'application/json',
       },
-      systemInstruction: {
-        role: 'system',
-        parts: [
-          {
-            text: `You will return responses in this JSON format:
+      systemInstruction: `You will return responses in this JSON format:
+        {
+          "relatedCompanies": ["List of related companies"]
+        }`
+    };
+
+    this.modelConfigs.countryFinder = {
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+      systemInstruction: `You will return responses in this JSON format:
             {
               "country": "The country of the given company",
               "confidence": 9,
               "headquarters": "The headquarters of the given company"
             }`
-          }
-        ]
-      },
-      
-    });
+    };
 
     // Parent company finder model
-    this.models.parentCompanyFinder = this.genAI.getGenerativeModel({
+    this.modelConfigs.parentCompanyFinder = {
       model: 'gemini-2.0-flash',
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            parentCompany: { 
-              type: SchemaType.STRING, 
-              description: 'The parent company of the given company', 
-              nullable: false 
-            },
-          },
-        },
       },
-    });
+      systemInstruction:  `You will return responses in this JSON format:
+            {
+              "parentCompany": "The parent company of the given company"
+            }`
+    };
 
     // Report finder model
-    this.models.reportFinder = this.genAI.getGenerativeModel({
+    this.modelConfigs.reportFinder = {
       model: 'gemini-2.0-flash',
       generationConfig: {
         temperature: 0.1,
       },
-      systemInstruction: {
-        role: 'system',
-        parts: [
-          {
-            text: `You will return responses in this JSON format:
+      systemInstruction: `You will return responses in this JSON format:
             {
               "reportUrl": "The URL of the ESG report"
             }
             
             The reportUrl field is required and must be a string.`
-          }
-        ]
-      }
-    });
+    };
 
     // Direct report finder model
-    this.models.directReportFinder = this.genAI.getGenerativeModel({
+    this.modelConfigs.directReportFinder = {
       model: 'gemini-2.0-flash',
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            reportUrl: { 
-              type: SchemaType.STRING, 
-              description: 'The direct URL to the company\'s latest ESG/sustainability report PDF' 
-            },
-            reportYear: { 
-              type: SchemaType.STRING, 
-              description: 'The year of the report (e.g., "2023", "2023-2024", etc.)' 
-            },
-            confidence: { 
-              type: SchemaType.NUMBER, 
-              description: 'Confidence score from 0-10 that this is the correct and latest report for the company' 
-            },
-            reasoning: { 
-              type: SchemaType.STRING, 
-              description: 'Brief explanation of why this is believed to be the correct report URL' 
-            }
-          },
-          required: ["reportUrl", "confidence"]
-        },
-        temperature: 0.1,
       },
-    });
+      systemInstruction: `You will return responses in this JSON format:
+            {
+              "reportUrl": "The URL of the ESG report"
+            }
+            
+            The reportUrl field is required and must be a string.`
+    };
 
     // ESG model
-    this.models.esg = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+    this.modelConfigs.esg = {
+      model: 'gemini-2.5-pro-preview-03-25',
       generationConfig: {
         responseMimeType: 'application/json',
       },
-      systemInstruction: {
-        role: 'system',
-        parts: [
-          {
-            text: `You will return responses in this JSON format:
+      systemInstruction:  `You will return responses in this JSON format:
             {
               "format": "The format of the response",
               "containsRelevantData": true,
@@ -165,22 +133,16 @@ export class GeminiModelService {
                 }
               }
             }`
-          }
-        ]
-      }
-    });
+          
+    };
 
     // Revenue model
-    this.models.revenue = this.genAI.getGenerativeModel({
+    this.modelConfigs.revenue = {
       model: 'gemini-2.0-flash',
       generationConfig: {
         responseMimeType: 'application/json',
       },
-      systemInstruction: {
-        role: 'system',
-        parts: [
-          {
-            text: `You will research and provide accurate financial information about companies.
+      systemInstruction:  `You will research and provide accurate financial information about companies.
 
 When asked about a company, you will:
 1. Find the annual revenue for the requested year or most recent year available
@@ -234,20 +196,33 @@ For a smaller European company with preliminary data:
   "sourceUrl": "https://forbes.com/private-companies/2022",
   "confidence": 6
 }`
-          }
-        ]
-      }
-    });
+          
+      
+    };
   }
 
-  getModel(modelName: string): GenerativeModel {
-    if (!this.models[modelName]) {
+  getModel(modelName: string) {
+    if (!this.modelConfigs[modelName]) {
       throw new Error(`Model ${modelName} not found`);
     }
-    return this.models[modelName];
+    
+    // Create a wrapper that includes the model configuration
+    return {
+      generateContent: (params: any) => {
+        const config = this.modelConfigs[modelName];
+        return this.ai.models.generateContent({
+          model: config.model,
+          config: {
+            ...config.generationConfig,
+            systemInstruction: config.systemInstruction,
+          },
+          ...params
+        });
+      }
+    };
   }
 
-  getGenAI(): GoogleGenerativeAI {
-    return this.genAI;
+  getGenAI(): GoogleGenAI {
+    return this.ai;
   }
 } 

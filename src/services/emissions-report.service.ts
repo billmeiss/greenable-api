@@ -37,6 +37,10 @@ export class EmissionsReportService {
           "containsRelevantData": true|false,
           "reportingPeriod": "string - the reporting year or period (e.g., '2022' or 'FY 2021-2022')",
           "standardUnit": "string - the standard unit used for emissions",
+          "company": {
+            "country": "string - the country of the company",
+            "name": "string - the name of the company"
+          },
           "scope1": {
             "value": number,
             "unit": "string",
@@ -108,6 +112,8 @@ export class EmissionsReportService {
         Assign confidence scores (0-10) to each data point based on clarity and reliability.
         Note any potential issues, missing data, or uncertainties.
 
+        Fetch the company name from the report.
+
         You must convert all values to the standard unit of tons of CO2 equivalent.
       `;
       
@@ -116,7 +122,7 @@ export class EmissionsReportService {
       
       // Create the main processing promise
       const result = await this.geminiApiService.handleGeminiCall(
-        () => this.geminiAiService.processPDF(reportUrl, extractionPrompt, 'gemini-2.0-flash')
+        () => this.geminiAiService.processPDF(reportUrl, extractionPrompt, 'esg')
       );
       
       

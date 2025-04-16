@@ -4,6 +4,14 @@ import { GeminiModelService } from './gemini-model.service';
 import { GoogleAuthService } from './google-auth.service';
 import { sheets_v4 } from 'googleapis';
 import axios from 'axios';
+import { readFile } from 'fs/promises';
+
+// Add type definition for Gemini API response
+interface GeminiResponse {
+  response: {
+    text(): string;
+  };
+}
 
 interface RevenueData {
   revenue: number;
@@ -107,16 +115,16 @@ export class CompanyService {
       
       const result = await this.geminiApiService.handleGeminiCall(
         () => parentCompanyFinderModel.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: prompt,
         })
       );
       
-      if (!result || !result.response) {
+      if (!result || !result) {
         throw new Error('Failed to generate content from Gemini');
       }
       
       // Parse the response
-      const responseText = result.response.text();
+      const responseText = result.text;
       const parsedResponse = this.geminiApiService.safelyParseJson(responseText);
       
       if (!parsedResponse || !parsedResponse.parentCompany) {
@@ -321,11 +329,11 @@ export class CompanyService {
         })
       );
       
-      if (!result || !result.response) {
+      if (!result || !result) {
         throw new Error('Failed to generate content from Gemini');
       }
       
-      const parsedResponse = this.geminiApiService.safelyParseJson(result.response.text());
+      const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
       
       if (!parsedResponse || !parsedResponse.revenue) {
         this.logger.warn(`Failed to get revenue data for ${companyName}`);
@@ -336,6 +344,47 @@ export class CompanyService {
     } catch (error) {
       this.logger.error(`Error getting revenue for ${companyName}: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * Get related companies
+   */
+  async getRelatedCompanies(companyName: string): Promise<string[]> {
+    try {
+      const relatedCompaniesModel = this.geminiModelService.getModel('relatedCompanies');
+
+      const existingCompanies = await this.getExistingCompaniesFromSheet();
+
+      const result = await this.geminiApiService.handleGeminiCall(
+        () => relatedCompaniesModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: `I need to find related competitors of similar size and region to ${companyName}. Please return a list of 10 related competitors in JSON format. IMPORTANT: Do not include any of the following companies in your response: ${existingCompanies.join(', ')}.` }] }],
+        })
+      );
+      
+      if (!result || !result) {
+        console.error(result);
+        return [];
+      }
+      
+      const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+
+      if (!parsedResponse || !parsedResponse.relatedCompanies) {
+        this.logger.warn(`Failed to get related companies for ${companyName}`);
+        return [];
+      }
+
+            // Check the spreadsheet to make sure the company is not already in the list
+      if (existingCompanies.some(company => company.name === companyName)) {
+        // Return the non duplicate companies
+        const nonDuplicateCompanies = parsedResponse.relatedCompanies.filter(company => !existingCompanies.some(existingCompany => existingCompany.name === company));
+        return nonDuplicateCompanies;
+      }
+      
+      return parsedResponse.relatedCompanies;
+    } catch (error) {
+      this.logger.error(`Error getting related companies for ${companyName}: ${error.message}`);
+      return [];
     }
   }
 
@@ -379,11 +428,11 @@ export class CompanyService {
       console.log(`[STEP] Fetching data from 'Companies to Request' sheet`);
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: "'Analysed Data'!A2:E",
+        range: "'Analysed Data'!A2:G",
       });
       
       const rows = response.data.values || [];
-      const companies = rows.map(row => ({ name: row[0], reportingPeriod: row[3], revenueYear: row[4]})).filter(Boolean);
+      const companies = rows.map(row => ({ name: row[0], reportingPeriod: row[3], revenueYear: row[4], revenue: row[5], exchangeRateCountry: row[6]})).filter(Boolean);
 
       return companies;
     } catch (error) {
@@ -447,11 +496,11 @@ export class CompanyService {
         })
       );
       
-      if (!result || !result.response) {
+      if (!result || !result) {
         throw new Error('Failed to generate content from Gemini');
       }
       
-      const parsedResponse = this.geminiApiService.safelyParseJson(result.response.text());
+      const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
       
       if (!parsedResponse || !parsedResponse.country) {
         this.logger.warn(`Failed to determine country for ${companyName}`);
@@ -602,11 +651,18 @@ export class CompanyService {
       
       // Prepare revenue data
       console.log(`[STEP] Processing revenue data for ${company}`);
-      const revenue = revenueData?.revenue || null;
+      let revenue = revenueData?.revenue || null;
       const revenueYear = revenueData?.year || null;
       const revenueSource = revenueData?.source || null;
       const revenueSourceUrl = revenueData?.sourceUrl || null;
-      const revenueCurrency = revenueData?.currency || 'USD';
+      let revenueCurrency = revenueData?.currency || 'USD';
+
+      if (revenueCurrency !== 'USD') {
+        const exchangeRate = await this.getExchangeRate(reportingPeriod, revenueCurrency);
+        revenue = revenue / exchangeRate;
+        revenueCurrency = 'USD';
+      }
+
       console.log(`[DETAIL] Revenue: ${revenue || 'Not available'} ${revenueCurrency}, Year: ${revenueYear || 'N/A'}`);
       console.log(`[DETAIL] Revenue source: ${revenueSource || 'Not available'}, URL: ${revenueSourceUrl || 'N/A'}`);
       
@@ -666,8 +722,8 @@ export class CompanyService {
         revenueYear,
         revenue,
         revenueCurrency,
-                revenueSourceUrl,
-                emissionsUnit,
+        revenueSourceUrl,
+        emissionsUnit,
         scope1Value,
         scope2LocationValue,
         scope2MarketValue,
@@ -755,10 +811,10 @@ export class CompanyService {
       // Update the cell with the new revenue data and year
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: `Copy of Analysed Data!E${companyIndex + 2}`,
+        range: `Analysed Data!E${companyIndex + 2}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: [[revenueData.year, revenueData.revenue]],
+          values: [[revenueData.year, revenueData.revenue, revenueData.currency]],
         },
       });
 
@@ -785,6 +841,21 @@ export class CompanyService {
       // If multiple years found, take the later one (likely the end of reporting period)
       const years = yearMatches.map(y => parseInt(y));
       return Math.max(...years);
+    }
+    
+    // Look for fiscal year patterns in FY2023 format (4-digit year)
+    const fyFullYearMatches = reportingPeriod.match(/\bFY(20\d{2})\b/gi);
+    if (fyFullYearMatches && fyFullYearMatches.length > 0) {
+      // Extract the fiscal year (e.g., "2023" from "FY2023")
+      const fyYears = fyFullYearMatches.map(fy => {
+        const match = fy.match(/(20\d{2})/);
+        return match ? parseInt(match[0]) : null;
+      }).filter(Boolean);
+      
+      if (fyYears.length > 0) {
+        // Take the latest fiscal year if multiple are found
+        return Math.max(...fyYears);
+      }
     }
     
     // Look for fiscal year patterns in the reporting period e.g. FY24
@@ -848,5 +919,54 @@ export class CompanyService {
     }
   }
 
+  async getExchangeRates(): Promise<any> {
+    const rates = await readFile('src/rates.json', 'utf8');
+    return JSON.parse(rates);
+  }
+
+  async getExchangeRate(reportingPeriod: string, exchangeRateCountry: string): Promise<number> {
+    const rates = await this.getExchangeRates();
+    const year = this.extractYearFromPeriod(reportingPeriod);
+    if (year !== 2021 && year !== 2022 && year !== 2023 && year !== 2024) {
+      return rates['2024'][exchangeRateCountry];
+    } else {
+      return rates[year][exchangeRateCountry];
+    }
+  }
+
+  async updateCompanyCountry(company: string, country: string): Promise<boolean> {
+    try {
+      console.log(`[STEP] Updating country for ${company} in 'Analysed Data' sheet`);
+      
+      // Initialize Google Sheets client
+      await this.initializeSheetsClient();
+
+      // Find the row index of the company in the 'Analysed Data' sheet
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
+        range: `Analysed Data!A2:E`,
+      });
+
+      const rows = response.data.values || [];
+      const companyIndex = rows.findIndex(row => row[0] === company);
+
+      // Update the cell with the new country data
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
+        range: `Analysed Data!AD${companyIndex + 2}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [[country]],
+        },
+      });
+
+      console.log(`[RESULT] Successfully updated country for ${company} in 'Analysed Data' sheet`);
+      return true;
+    } catch (error) {
+      console.log(`[ERROR] Error updating country for ${company}: ${error.message}`);
+      return false;
+    }
+  }
+  
 
 }

@@ -33,7 +33,11 @@ export class ReportProcessingService {
       
       // Process each company
       for (const company of companies) {
+        const relatedCompanies = await this.companyService.getRelatedCompanies(company);
         await this.processCompany(company);
+        for (const relatedCompany of relatedCompanies) {
+          await this.processCompany(relatedCompany);
+        }
       }
       
       return `Processed ${companies.length} companies successfully.`;
@@ -46,7 +50,7 @@ export class ReportProcessingService {
   /**
    * Process a single company
    */
-  private async processCompany(company: string): Promise<void> {
+  async processCompany(company: string): Promise<void> {
     try {
       this.logger.log(`Processing company: ${company}`);
       
@@ -66,7 +70,7 @@ export class ReportProcessingService {
       const currentYear = new Date().getFullYear();
       
       // Try to find the latest report
-      const reportData = await this.getCompanyESGReports(companyToProcess);
+      const reportData = await this.getCompanyESGReportData(companyToProcess);
       
       if (!reportData) {
         this.logger.warn(`No report found for ${companyToProcess}`);
@@ -92,16 +96,16 @@ export class ReportProcessingService {
       
       // 3. Get company revenue data for the same reporting period as emissions
       const reportingPeriod = reportData.emissions?.reportingPeriod || null;
-      const revenueData = await this.companyService.getCompanyRevenue(companyToProcess, reportingPeriod);
+      const revenueData = await this.companyService.getCompanyRevenue(reportData.emissions.company?.name ?? companyToProcess, reportingPeriod);
 
-      const countryData = await this.companyService.determineCompanyCountry(companyToProcess);
+      const countryData = await this.companyService.determineCompanyCountry(reportData.emissions.company?.name ?? companyToProcess);
 
       console.log(countryData);
 
       
       // 5. Add data to spreadsheet
       await this.companyService.addCompanyToSheet(
-        company,
+        reportData.emissions.company?.name ?? companyToProcess,
         reportData.emissions,
         reportData.reportUrl,
         revenueData,
@@ -118,7 +122,7 @@ export class ReportProcessingService {
   /**
    * Get ESG reports for a company
    */
-  async getCompanyESGReports(company: string): Promise<{emissions: any, reportUrl: string} | null> {
+  async getCompanyESGReportData(company: string): Promise<{emissions: any, reportUrl: string} | null> {
     try {
       this.logger.log(`Getting ESG reports for ${company}`);
       
@@ -128,7 +132,7 @@ export class ReportProcessingService {
       for (let year = currentYear; year >= currentYear - 2; year--) {
         this.logger.log(`Searching for ${company} report from ${year}`);
         
-        const reportData = await this.reportFinderService.findReportWithGemini(company, year);
+        const reportData = await this.reportFinderService.findReportDataWithGemini(company, year);
         
         if (reportData) {
           this.logger.log(`Found ${company} report for ${year}`);
