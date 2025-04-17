@@ -356,9 +356,25 @@ export class CompanyService {
 
       const existingCompanies = await this.getExistingCompaniesFromSheet();
 
+      console.log(existingCompanies.map(company => company.name).join(', '))
+
       const result = await this.geminiApiService.handleGeminiCall(
         () => relatedCompaniesModel.generateContent({
-          contents: [{ role: 'user', parts: [{ text: `I need to find related competitors of similar size and region to ${companyName}. Please return a list of 10 related competitors in JSON format. IMPORTANT: Do not include any of the following companies in your response: ${existingCompanies.join(', ')}.` }] }],
+          contents: [{ role: 'user', parts: [{ text: `I need to find related competitors of similar size and region to ${companyName}. 
+
+INSTRUCTIONS:
+1. Return a list of exactly 10 related competitors in JSON format.
+2. EXCLUSION REQUIREMENT: You MUST NOT include any of the following companies in your results. Before finalizing your response, verify each company name against this exclusion list:
+   ${existingCompanies.map(company => `"${company.name}"`).join(', ')}
+3. If you find any company on the exclusion list in your results, remove it and replace with a different suitable company.
+4. Return ONLY companies that are NOT in the above exclusion list.
+
+The response format should be:
+{
+  "relatedCompanies": ["Company1", "Company2", "Company3", "Company4", "Company5", "Company6", "Company7", "Company8", "Company9", "Company10"]
+}
+
+Again, verify your final list against the exclusion list to ensure NO overlaps.` }] }],
         })
       );
       
@@ -368,6 +384,8 @@ export class CompanyService {
       }
       
       const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+
+      console.log(parsedResponse);
 
       if (!parsedResponse || !parsedResponse.relatedCompanies) {
         this.logger.warn(`Failed to get related companies for ${companyName}`);
@@ -386,6 +404,36 @@ export class CompanyService {
       this.logger.error(`Error getting related companies for ${companyName}: ${error.message}`);
       return [];
     }
+  }
+
+  /**
+   * Get company category
+   */
+  async getCompanyCategory(companyName: string): Promise<string | null> {
+    const companyCategoryModel = this.geminiModelService.getModel('companyCategory');
+
+    const result = await this.geminiApiService.handleGeminiCall(
+      () => companyCategoryModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: `I need to find the category of ${companyName}.` }] }],
+      })
+    );
+
+    console.log(result.candidates[0].content.parts[0].text);
+
+    if (!result || !result) {
+      throw new Error('Failed to generate content from Gemini');
+    }
+
+    const parsedResponse = this.geminiApiService.safelyParseJson(result.candidates[0].content.parts[0].text);
+
+    console.log(parsedResponse);
+
+    if (!parsedResponse || !parsedResponse.companyCategory) {
+      this.logger.warn(`Failed to get company category for ${companyName}`);
+      return null;
+    }
+
+    return parsedResponse.companyCategory;
   }
 
   /**
@@ -576,7 +624,7 @@ export class CompanyService {
     emissions: any, 
     reportUrl: string, 
     revenueData: any = null, 
-    previousYearData: any = null,
+    companyCategory: any = null,
     countryData: any = null,
   ): Promise<boolean> {
     console.log(`[STEP] Adding data for ${company} to spreadsheet`);
@@ -676,27 +724,6 @@ export class CompanyService {
       const overallConfidence = this.calculateOverallConfidence(emissions, revenueData, countryData);
       console.log(`[DETAIL] Overall confidence level: ${overallConfidence}`);
       
-      // Prepare previous year data for percentage calculations
-      console.log(`[STEP] Calculating year-over-year changes for ${company}`);
-      const previousScope1 = previousYearData?.emissions?.scope1?.value || null;
-      const previousScope2LocationBased = previousYearData?.emissions?.scope2?.locationBased?.value || null;
-      const previousScope2MarketBased = previousYearData?.emissions?.scope2?.marketBased?.value || null;
-      const previousScope3 = previousYearData?.emissions?.scope3?.total?.value || null;
-      
-      // Calculate percentage changes
-      const scope1Change = this.calculateChangePercentage(scope1Value, previousScope1);
-      const scope2LocationChange = this.calculateChangePercentage(scope2LocationValue, previousScope2LocationBased);
-      const scope2MarketChange = this.calculateChangePercentage(scope2MarketValue, previousScope2MarketBased);
-      const scope3Change = this.calculateChangePercentage(scope3Value, previousScope3);
-      
-      if (previousScope1 || previousScope2LocationBased || previousScope2MarketBased || previousScope3) {
-        console.log(`[DETAIL] Year-over-year changes:`);
-        if (scope1Change) console.log(`[DETAIL] Scope 1: ${scope1Change}%`);
-        if (scope2LocationChange) console.log(`[DETAIL] Scope 2 (Location): ${scope2LocationChange}%`);
-        if (scope2MarketChange) console.log(`[DETAIL] Scope 2 (Market): ${scope2MarketChange}%`);
-        if (scope3Change) console.log(`[DETAIL] Scope 3: ${scope3Change}%`);
-      }
-      
       // Calculate intensity metrics if revenue is available
       console.log(`[STEP] Calculating emissions intensity metrics for ${company}`);
       const scope1Intensity = revenue && scope1Value ? scope1Value / revenue : null;
@@ -731,6 +758,7 @@ export class CompanyService {
         ...Object.values(categoryValues),
         revenueSource,
         country,
+        companyCategory,
       ];
       
       // Add the data to the sheet
@@ -744,33 +772,7 @@ export class CompanyService {
           values: [rowData],
         },
       });
-      
-      // Add scope 3 categories summary to a separate sheet
-      console.log(`[STEP] Adding scope 3 category data to 'Scope 3 Categories' sheet for ${company}`);
-      const scope3SummaryData = [
-        company,
-        reportingPeriod,
-        scope3Value,
-        emissionsUnit,
-        scope3Notes,
-        scope3Confidence,
-        includedCategories.join(', '),
-        missingCategories.join(', '),
-        country,
-        overallConfidence,
-        revenueSourceUrl,
-        revenueCurrency,
-      ];
-      
-      await this.sheets.spreadsheets.values.append({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: 'Scope 3 Categories!A2',
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: {
-          values: [scope3SummaryData],
-        },
-      });
+    
       
       console.log(`[RESULT] Successfully added all data for ${company} to spreadsheets`);
       return true;

@@ -17,15 +17,191 @@ export class GeminiModelService {
       model: 'gemini-2.0-flash',
     };
 
-    // Related companies model
-    this.modelConfigs.relatedCompanies = {
-      model: 'gemini-2.0-flash',
+    this.modelConfigs.companyCategory = {
+      model: 'gemini-2.5-pro-preview-03-25',
       generationConfig: {
         responseMimeType: 'application/json',
       },
       systemInstruction: `You will return responses in this JSON format:
         {
-          "relatedCompanies": ["List of related companies"]
+          "companyCategory": "The category of the given company, can be one of the following:
+            Basic Copper
+            Publishing
+            Printing
+            Plastic Products
+            Civil Engineering Construction
+            Telecommunications
+            Other Services
+            Uranium Ores
+            Hard Coal
+            Raising Of Cattle
+            Non-nitrogenous And Mixed Fertilizers
+            Computers Electronic Products Optical And Precision Instruments
+            Building Construction
+            Growing Beverage Crops (coffee, Tea Etc)
+            Quarrying Of Stone, Sand And Clay
+            Growing Tobacco
+            Growing Wheat
+            Forestry And Logging
+            Materials Recovery
+            Basic Organic Chemicals
+            Water Transport
+            Basic Inorganic Chemicals
+            Copper Ores
+            Cereal Products
+            Other Non-ferrous Ores (e.g. Nickel, Tin, Lead, Zinc, Silver, Gold)
+            Hospitality
+            Dyes, Paints, Glues, Detergents And Other Chemical Products
+            Leather And Footwear
+            Transport Via Pipeline
+            Repair And Installation Of Machinery And Equipment
+            Road Transport
+            Government Social Security Defence Public Order
+            Gas Extraction
+            Motor Vehicles, Trailers And Semi-trailers
+            Growing Crops N.e.c.
+            Furniture And Other Manufacturing N.e.c
+            Basic Non-ferrous Metals N.e.c.
+            Information Services
+            Other Ceramics N.e.c. (e.g. Cement, Lime, Plaster)
+            Clay Building Materials
+            Arts, Entertainment And Recreation
+            Education
+            Growing Grapes
+            Fabricated Metal Products
+            Electric Power Generation, Transmission And Distribution
+            Motor Vehicles, Trailers And Semi-trailers
+            Fishing
+            Basic Aluminium
+            Raising Of Poultry
+            Growing Maize
+            Basic Non-ferrous Metals N.e.c.
+            Basic Copper
+            Chemical And Fertilizer Minerals
+            Rail Transport
+            Growing Sugar Beet And Cane
+            Animal Oils And Fats
+            Civil Engineering Construction
+            Growing Spices, Aromatic, Drug And Pharmaceutical Crops
+            Other Non-ferrous Ores
+            Raising Of Sheep
+            Growing Grapes
+            Distribution Of Gaseous Fuels Through Mains
+            Dairy Products
+            Sheep Meat
+            Growing Crops N.e.c.
+            Non-nitrogenous And Mixed Fertilizers
+            Lead/zinc/silver Ores
+            Fish Products
+            Mining And Quarrying N.e.c. Services To Mining
+            Basic Nickel
+            Sawmill Products
+            Waste Collection, Treatment, And Disposal
+            Nickel Ores
+            Road Transport
+            Arts, Entertainment And Recreation
+            Fruit Products
+            Information Services
+            Electrical Equipment
+            Fabricated Metal Products
+            Pharmaceuticals And Medicinal Products
+            Professional, Scientific And Technical Services
+            Copper Ores
+            Postal And Courier Services
+            Extraction Of Salt
+            Growing Fruits And Nuts
+            Quarrying Of Stone, Sand And Clay
+            Coke Oven Products
+            Growing Vegetables, Roots, Tubers
+            Basic Iron And Steel
+            Gas Extraction
+            Forestry And Logging
+            Sugar Refining Cocoa, Chocolate And Confectionery
+            Vegetable Oils And Fats
+            Vegetable Products
+            Human Health And Social Work Activities
+            Tobacco Products
+            Materials Recovery
+            Air Transport
+            Aluminium Ore
+            Pork
+            Clay Building Materials
+            Property And Real Estate
+            Rubber Products
+            Basic Organic Chemicals
+            Water Collection, Treatment And Supply Sewerage
+            Administrative Services
+            Other Services (e.g. consulting, marketing, etc)
+            Growing Fibre Crops
+            Pulp And Paper
+            Leather And Footwear
+            Transport Via Pipeline
+            Telecommunications
+            Cereal Products
+            Basic Tin
+            Other Transport Equipment (e.g. Ships, Planes, Trains)
+            Computers Electronic Products Optical And Precision Instruments
+            Repair And Installation Of Machinery And Equipment
+            Refined Petroleum Products
+            Alcoholic And Other  Beverages
+            Dyes, Paints, Glues, Detergents And Other Chemical Products
+            Raising Of Cattle
+            Finance And Insurance
+            Food Products And Feeds N.e.c.
+            Seeds And Plant Propagation
+            Growing Leguminous Crops And Oil Seeds
+            Growing Beverage Crops (coffee, Tea Etc)
+            Hard Coal
+            Other Non-metallic Mineral Products N.e.c.
+            Services To Transport
+            Textiles And Clothing
+            Other Meat Products
+            Hospitality
+            Basic Petrochemical Products
+            Basic Gold
+            Other Ceramics N.e.c.
+            Growing Rice
+            Cement, Lime And Plaster Products
+            Government Social Security Defence Public Order
+            Growing Cereals N.e.c
+            Uranium Ores
+            Furniture And Other Manufacturing N.e.c
+            Basic Inorganic Chemicals
+            Basic Lead/zinc/silver
+            Education
+            Machinery And Equipment
+            Raising Of Animals N.e.c. Services To Agriculture
+            Water Transport
+            Crustaceans And Molluscs
+            Beef Meat
+            Petroleum Extraction
+            Wholesale And Retail Trade Repair Of Motor Vehicles And Motorcycles
+            Growing Wheat
+            Publishing
+            Raising Of Swine/pigs
+            Growing Tobacco
+            Printing
+            Lignite And Peat
+            Plastic Products
+            Tin Ores
+            Poultry Meat
+            Iron Ores
+            Nitrogenous Fertilizers
+            Building Construction
+            Gold Ores
+          "
+        }`
+    }
+
+    // Related companies model
+    this.modelConfigs.relatedCompanies = {
+      model: 'gemini-2.5-pro-preview-03-25',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+      systemInstruction: `You will return responses in this JSON format:
+        {
+          "relatedCompanies": ["List of related companies excluding any existing companies"]
         }`
     };
 

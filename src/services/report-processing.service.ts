@@ -97,11 +97,8 @@ export class ReportProcessingService {
       // 3. Get company revenue data for the same reporting period as emissions
       const reportingPeriod = reportData.emissions?.reportingPeriod || null;
       const revenueData = await this.companyService.getCompanyRevenue(reportData.emissions.company?.name ?? companyToProcess, reportingPeriod);
-
       const countryData = await this.companyService.determineCompanyCountry(reportData.emissions.company?.name ?? companyToProcess);
-
-      console.log(countryData);
-
+      const companyCategory = await this.companyService.getCompanyCategory(reportData.emissions.company?.name ?? companyToProcess);
       
       // 5. Add data to spreadsheet
       await this.companyService.addCompanyToSheet(
@@ -109,7 +106,7 @@ export class ReportProcessingService {
         reportData.emissions,
         reportData.reportUrl,
         revenueData,
-        null,
+        companyCategory,
         countryData
       );
       
@@ -144,72 +141,6 @@ export class ReportProcessingService {
       return null;
     } catch (error) {
       this.logger.error(`Error getting ESG reports for ${company}: ${error.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * Get previous year report for a company
-   */
-  async getPreviousYearReport(
-    company: string, 
-    currentYear: number
-  ): Promise<{emissions: any, reportUrl: string} | null> {
-    try {
-      const previousYear = currentYear - 1;
-      
-      this.logger.log(`Looking for previous year (${previousYear}) report for ${company}`);
-      
-      // First, try to find the previous year report directly
-      const reportData = await this.findPreviousYearReportWithGemini(
-        company, 
-        previousYear
-      );
-      
-      if (reportData) {
-        return reportData;
-      }
-      
-      this.logger.warn(`No previous year report found for ${company}`);
-      return null;
-    } catch (error) {
-      this.logger.error(`Error getting previous year report for ${company}: ${error.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * Find previous year report for a company
-   */
-  private async findPreviousYearReportWithGemini(
-    company: string, 
-    targetYear: number, 
-    publishYear: number = null
-  ): Promise<{emissions: any, reportUrl: string} | null> {
-    try {
-      // Search with historical flag
-      const searchResults = await this.reportFinderService.searchForESGReports(
-        company, 
-        targetYear, 
-        true // Use historical search
-      );
-      
-      if (!searchResults || searchResults.length === 0) {
-        this.logger.warn(`No search results for historical report ${company} ${targetYear}`);
-        return null;
-      }
-      
-      // Process results specifically looking for the target year
-      // and rejecting the current year
-      return await this.reportFinderService.processSearchResultsForReport(
-        company,
-        searchResults,
-        targetYear, // expecting this year
-        publishYear, // rejecting this year (if provided)
-        10 // increase max attempts for historical reports
-      );
-    } catch (error) {
-      this.logger.error(`Error finding previous year report for ${company}: ${error.message}`);
       return null;
     }
   }
