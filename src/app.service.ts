@@ -103,6 +103,15 @@ export class AppService {
       }
     }
   }
+
+  async updateCategories(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    for (const company of companies) {
+      const { name } = company;
+      const category = await this.companyService.getCompanyCategory(name);
+      await this.companyService.updateCompanyCategory(name, category);
+    }
+  }
 }
 
 

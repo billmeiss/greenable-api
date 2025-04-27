@@ -970,5 +970,37 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
   }
   
+  async updateCompanyCategory(company: string, category: string): Promise<boolean> {
+    try {
+      console.log(`[STEP] Updating category for ${company} in 'Analysed Data' sheet`);
+      
+      // Initialize Google Sheets client
+      await this.initializeSheetsClient();
+      
+      // Find the row index of the company in the 'Analysed Data' sheet
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
+        range: `Analysed Data!A2:E`,
+      });
 
+      const rows = response.data.values || [];
+      const companyIndex = rows.findIndex(row => row[0] === company);
+
+      // Update the cell with the new category data
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
+        range: `Copy of Final V1!AE${companyIndex + 2}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [[category]],
+        },
+      });
+
+      console.log(`[RESULT] Successfully updated category for ${company} in 'Analysed Data' sheet`);
+      return true;
+    } catch (error) {
+      console.log(`[ERROR] Error updating category for ${company}: ${error.message}`);
+      return false;
+    }
+  }
 }

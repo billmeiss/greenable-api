@@ -25,6 +25,11 @@ export class AppController {
     return this.appService.updateCountries();
   }
 
+  @Post('/update-categories')
+  updateCategories() {
+    return this.appService.updateCategories();
+  }
+
   @Post('/company') 
   processCompany(@Body() {
     name,
