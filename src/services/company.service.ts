@@ -149,6 +149,12 @@ export class CompanyService {
   async doesCompanyExist(companyName: string): Promise<boolean> {
     const existingCompanies = await this.getExistingCompaniesFromSheet();
 
+    const doesCompanyExist = existingCompanies.some(company => this.isSameCompany(company.name, companyName));
+
+    if (doesCompanyExist) {
+      return true;
+    }
+
     // call gemini to check if companyName is in existingCompanies
     const result = await this.geminiApiService.handleGeminiCall(
       () => this.geminiModelService.getModel('companyNameChecker').generateContent({
@@ -383,6 +389,7 @@ INSTRUCTIONS:
    ${existingCompanies.map(company => `"${company.name}"`).join(', ')}
 3. If you find any company on the exclusion list in your results, remove it and replace with a different suitable company.
 4. Return ONLY companies that are NOT in the above exclusion list.
+5. The companies must not have overlapping parent companies.
 
 The response format should be:
 {

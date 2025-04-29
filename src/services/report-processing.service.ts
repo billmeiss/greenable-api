@@ -101,6 +101,13 @@ export class ReportProcessingService {
         
         return; // Skip further processing for this company
       }
+
+      const doesCompanyExist = await this.companyService.doesCompanyExist(reportData.emissions.company?.name);
+
+      if (doesCompanyExist) {
+        this.logger.log(`Company ${reportData.emissions.company?.name} already exists, skipping...`);
+        return;
+      }
       
       // 3. Get company revenue data for the same reporting period as emissions
       const reportingPeriod = reportData.emissions?.reportingPeriod || null;
