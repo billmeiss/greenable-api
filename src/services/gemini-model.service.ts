@@ -17,6 +17,17 @@ export class GeminiModelService {
       model: 'gemini-2.0-flash',
     };
 
+    this.modelConfigs.companyNameChecker = {
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+      systemInstruction: `You will return responses in this JSON format:
+        {
+          "exists": boolean
+        }`
+    };
+
     this.modelConfigs.companyCategory = {
       model: 'gemini-2.5-pro-preview-03-25',
       generationConfig: {

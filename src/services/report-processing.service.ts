@@ -34,7 +34,11 @@ export class ReportProcessingService {
       // Process each company
       for (const company of companies) {
         const relatedCompanies = await this.companyService.getRelatedCompanies(company);
-        await this.processCompany(company);
+        const doesCompanyExist = await this.companyService.doesCompanyExist(company);
+
+        if (!doesCompanyExist) {
+          await this.processCompany(company);
+        }
         for (const relatedCompany of relatedCompanies) {
           await this.processCompany(relatedCompany);
         }
@@ -57,12 +61,16 @@ export class ReportProcessingService {
       // 1. Check for parent company
       const parentCompany = await this.companyService.findParentCompany(company);
       
+      const doesParentCompanyExist = await this.companyService.doesCompanyExist(parentCompany);
+      
       // If parent company is different and not null, use parent company instead
-      const companyToProcess = parentCompany && parentCompany !== company 
+      const companyToProcess = parentCompany && !doesParentCompanyExist && parentCompany !== company 
         ? parentCompany 
         : company;
+
+        console.log(doesParentCompanyExist, companyToProcess, parentCompany, company);
       
-      if (parentCompany && parentCompany !== company) {
+      if (parentCompany && !doesParentCompanyExist && parentCompany !== company) {
         this.logger.log(`Using parent company ${parentCompany} for ${company}`);
       }
       

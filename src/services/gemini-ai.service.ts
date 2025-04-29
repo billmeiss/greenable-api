@@ -164,10 +164,16 @@ export class GeminiAiService {
         },
       });
 
+      await this.deleteFile(file.name);
+
       return response.text;
     } catch (error) {
       console.error('Error processing PDF:', error);
       throw error;
     }
+  }
+
+  deleteFile(name: string) {
+    return this.ai.files.delete({ name });
   }
 } 

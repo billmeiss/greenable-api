@@ -146,6 +146,21 @@ export class CompanyService {
     }
   }
 
+  async doesCompanyExist(companyName: string): Promise<boolean> {
+    const existingCompanies = await this.getExistingCompaniesFromSheet();
+
+    // call gemini to check if companyName is in existingCompanies
+    const result = await this.geminiApiService.handleGeminiCall(
+      () => this.geminiModelService.getModel('companyNameChecker').generateContent({
+        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} in the following list? ${existingCompanies.map(company => company.name).join(', ')}` }] }],
+      })
+    );
+
+    const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+
+    return parsedResponse.exists;
+  }
+
   /**
    * Check if two company names refer to the same company
    */

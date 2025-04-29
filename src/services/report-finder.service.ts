@@ -4,6 +4,7 @@ import { GeminiModelService } from './gemini-model.service';
 import { SearchService } from './search.service';
 import { EmissionsReportService } from './emissions-report.service';
 import axios from 'axios';
+import { CompanyService } from './company.service';
 
 // Add type definition for Gemini API response
 interface GeminiResponse {
@@ -21,6 +22,7 @@ export class ReportFinderService {
     private readonly geminiModelService: GeminiModelService,
     private readonly searchService: SearchService,
     private readonly emissionsReportService: EmissionsReportService,
+    private readonly companyService: CompanyService,
   ) {}
 
   /**
@@ -213,6 +215,7 @@ export class ReportFinderService {
     maxAttempts: number = 5,
     withEmissions: boolean = true
   ): Promise<{emissions: any, reportUrl: string} | null> {
+    
     // Track URLs we've already tried
     const triedUrls = new Set<string>();
     let attemptCount = 0;
@@ -314,6 +317,8 @@ export class ReportFinderService {
       console.log(`[WARNING] No report URLs provided for ${company}`);
       return null;
     }
+
+    const existingCompanies = await this.companyService.getExistingCompaniesFromSheet();
     
     console.log(`[STEP] Verifying correct report for ${company} from ${reportUrls.length} candidates`);
     
@@ -333,6 +338,9 @@ export class ReportFinderService {
         2. From the company's own website (rather than a third-party site)
         3. A comprehensive primary source (not a summary or press release)
         4. The most recent available report
+
+        Make sure to disclude any reports from this list:
+        ${existingCompanies.map(company => company.name).join(', ')}
         
         Consider factors like:
         - URL patterns (e.g., contains terms like 'sustainability', 'ESG', 'annual', 'report')
