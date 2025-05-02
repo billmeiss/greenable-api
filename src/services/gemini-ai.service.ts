@@ -164,6 +164,8 @@ export class GeminiAiService {
         },
       });
 
+      console.log(file.name);
+
       await this.deleteFile(file.name);
 
       return response.text;
@@ -173,7 +175,8 @@ export class GeminiAiService {
     }
   }
 
-  deleteFile(name: string) {
+  async deleteFile(name: string) {
+    console.log(`[DEBUG] Deleting file: ${name}`);
     return this.ai.files.delete({ name });
   }
 } 

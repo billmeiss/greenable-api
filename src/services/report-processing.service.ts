@@ -41,6 +41,8 @@ export class ReportProcessingService {
           continue;
         }
 
+        this.logger.log(`Processing base company: ${company}`);
+
         const processedCompanyName = await this.processCompany(company);
         await this.companyService.addAttemptToSheet(company, processedCompanyName);
         

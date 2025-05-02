@@ -387,7 +387,7 @@ export class CompanyService {
           contents: [{ role: 'user', parts: [{ text: `I need to find related competitors of similar size and region to ${companyName}. 
 
 INSTRUCTIONS:
-1. Return a list of exactly 10 related competitors in JSON format.
+1. Return a list of exactly 3 related competitors in JSON format.
 2. EXCLUSION REQUIREMENT: You MUST NOT include any of the following companies in your results. Before finalizing your response, verify each company name against this exclusion list:
    ${companiesToExclude.join(', ')}
 3. If you find any company on the exclusion list in your results, remove it and replace with a different suitable company.
