@@ -76,14 +76,13 @@ export class CompanyService {
       const parentCompanyFinderModel = this.geminiModelService.getModel('parentCompanyFinder');
       
       const prompt = `
-        I need you to research and determine the parent company of ${companyName}, if it has one.
+        I need you to research and determine the non-government parent company of ${companyName}, ONLY if its is a subsidiary of another private company. 
         
         Rules:
         - If ${companyName} is already the top-level parent company, return "${companyName}" as the parent
         - If ${companyName} is a subsidiary, identify its ultimate parent company
-        - If ${companyName} has been acquired or merged, identify the current parent
+        - If the parent company is a government entity, return "${companyName}" as the parent
         - Use reliable, recent sources for your determination
-        - If multiple parent companies exist (joint venture), identify the majority owner
         
         Return your answer in the following JSON format only:
         
