@@ -376,8 +376,11 @@ export class CompanyService {
       const relatedCompaniesModel = this.geminiModelService.getModel('relatedCompanies');
 
       const existingCompanies = await this.getExistingCompaniesFromSheet();
+      const attempts = await this.getAttemptsFromSheet();
 
-      console.log(existingCompanies.map(company => company.name).join(', '))
+      const companiesToExclude = [...existingCompanies.map(company => company.name), ...attempts];
+
+      console.log(companiesToExclude.join(', '))
 
       const result = await this.geminiApiService.handleGeminiCall(
         () => relatedCompaniesModel.generateContent({
@@ -386,7 +389,7 @@ export class CompanyService {
 INSTRUCTIONS:
 1. Return a list of exactly 10 related competitors in JSON format.
 2. EXCLUSION REQUIREMENT: You MUST NOT include any of the following companies in your results. Before finalizing your response, verify each company name against this exclusion list:
-   ${existingCompanies.map(company => `"${company.name}"`).join(', ')}
+   ${companiesToExclude.join(', ')}
 3. If you find any company on the exclusion list in your results, remove it and replace with a different suitable company.
 4. Return ONLY companies that are NOT in the above exclusion list.
 5. The companies must not have overlapping parent companies.
@@ -418,6 +421,13 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       if (existingCompanies.some(company => company.name === companyName)) {
         // Return the non duplicate companies
         const nonDuplicateCompanies = parsedResponse.relatedCompanies.filter(company => !existingCompanies.some(existingCompany => existingCompany.name === company));
+        return nonDuplicateCompanies;
+      }
+
+      // Check if the company is already in the list
+      if (parsedResponse.relatedCompanies.some(company => company === companyName)) {
+        // Return the non duplicate companies
+        const nonDuplicateCompanies = parsedResponse.relatedCompanies.filter(company => company !== companyName);
         return nonDuplicateCompanies;
       }
       
@@ -1024,5 +1034,38 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       console.log(`[ERROR] Error updating category for ${company}: ${error.message}`);
       return false;
     }
+  }
+
+  /**
+   * Add attempt to sheet
+   */
+  async addAttemptToSheet(company: string, processedCompanyName: string): Promise<void> {
+    const sheet = await this.googleAuthService.getSheetsClient();
+    const sheetId = '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg';
+    const sheetName = 'ESG Report Attempts';
+    const value = [company, processedCompanyName, new Date().toISOString().split('T')[0]];
+    await sheet.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [value],
+      },
+    });
+  }
+
+  /**
+   * Get attempts from sheet
+   */
+  async getAttemptsFromSheet(): Promise<any[]> {
+    const sheet = await this.googleAuthService.getSheetsClient();
+    const sheetId = '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg';
+    const sheetName = 'ESG Report Attempts';
+    const response = await sheet.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!A1:A`,
+    });
+    const attempts = response.data.values || [];
+    return attempts.map(attempt => attempt[0]);
   }
 }

@@ -319,6 +319,9 @@ export class ReportFinderService {
     }
 
     const existingCompanies = await this.companyService.getExistingCompaniesFromSheet();
+    const attempts = await this.companyService.getAttemptsFromSheet();
+
+    const companiesToExclude = [...existingCompanies.map(company => company.name), ...attempts];
     
     console.log(`[STEP] Verifying correct report for ${company} from ${reportUrls.length} candidates`);
     
@@ -340,7 +343,7 @@ export class ReportFinderService {
         4. The most recent available report
 
         Make sure to disclude any reports from this list:
-        ${existingCompanies.map(company => company.name).join(', ')}
+        ${companiesToExclude.join(', ')}
         
         Consider factors like:
         - URL patterns (e.g., contains terms like 'sustainability', 'ESG', 'annual', 'report')

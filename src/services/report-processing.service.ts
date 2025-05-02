@@ -36,11 +36,17 @@ export class ReportProcessingService {
         const relatedCompanies = await this.companyService.getRelatedCompanies(company);
         const doesCompanyExist = await this.companyService.doesCompanyExist(company);
 
-        if (!doesCompanyExist) {
-          await this.processCompany(company);
+        if (doesCompanyExist) {
+          this.logger.log(`Company ${company} already exists, skipping...`);
+          continue;
         }
+
+        const processedCompanyName = await this.processCompany(company);
+        await this.companyService.addAttemptToSheet(company, processedCompanyName);
+        
         for (const relatedCompany of relatedCompanies) {
-          await this.processCompany(relatedCompany);
+          const processedRelatedCompanyName = await this.processCompany(relatedCompany);
+          await this.companyService.addAttemptToSheet(relatedCompany, processedRelatedCompanyName);
         }
       }
       
@@ -54,7 +60,7 @@ export class ReportProcessingService {
   /**
    * Process a single company
    */
-  async processCompany(company: string): Promise<void> {
+  async processCompany(company: string): Promise<string> {
     try {
       this.logger.log(`Processing company: ${company}`);
       
@@ -126,6 +132,7 @@ export class ReportProcessingService {
       );
       
       this.logger.log(`Successfully processed ${company}`);
+      return reportData.emissions.company?.name ?? companyToProcess;
     } catch (error) {
       this.logger.error(`Error processing company ${company}: ${error.message}`);
     }
