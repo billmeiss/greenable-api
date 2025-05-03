@@ -14,16 +14,19 @@ export class SearchService {
     try {
       console.log(`Performing web search for query: ${query}`);
       
+      const api_key = '6814da39aa4c4974fe0c63d4';
+      const url = 'https://api.scrapingdog.com/google/';
+      
       const params = {
-        q: query,
-        api_key: this.serpApiKey,
-        engine: 'google',
-        num: 10,
-        hl: 'en',
-        gl: 'us',
+        api_key: api_key,
+        query: query,
+        results: 10,
+        country: 'us',
+        page: 0,
+        advance_search: "false"
       };
       
-      const response = await axios.get('https://serpapi.com/search', { params });
+      const response = await axios.get(url, { params });
       
       if (!response.data || !response.data.organic_results) {
         console.log('No search results returned from SerpApi');
