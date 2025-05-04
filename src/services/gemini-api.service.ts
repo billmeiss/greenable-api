@@ -44,6 +44,7 @@ export class GeminiApiService {
         // Race the promises
         return await Promise.race([processingPromise, timeoutPromise]);
       } catch (error) {
+        console.log({error})
         // Skip retries for "too large" files - immediately throw the error
         if (error.message && error.message.includes('too large')) {
           this.logger.warn(`File is too large to process. Skipping without retry.`);
