@@ -274,6 +274,7 @@ export class GeminiModelService {
       model: 'gemini-2.5-flash-preview-04-17',
       generationConfig: {
         responseMimeType: 'application/json',
+        temperature: 0.1,
       },
       systemInstruction:  `You will return responses in this JSON format:
             {
