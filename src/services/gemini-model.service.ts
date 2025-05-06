@@ -271,7 +271,7 @@ export class GeminiModelService {
 
     // ESG model
     this.modelConfigs.esg = {
-      model: 'gemini-2.5-pro-preview-03-25',
+      model: 'gemini-2.5-pro-preview-05-06',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
