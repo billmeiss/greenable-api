@@ -31,7 +31,12 @@ export class GeminiAiService {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf',
-          'User-Agent': 'Mozilla/5.0 (compatible; GreenableAPI/1.0)'
+          'User-Agent': 'Mozilla/5.0 (compatible; GreenableAPI/1.0)',
+          // add headers to avoid 403
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',          
         },
         redirect: 'follow' // Follow redirects automatically
       });
@@ -45,31 +50,15 @@ export class GeminiAiService {
       const contentType = response.headers.get('content-type');
       console.log(`[INFO] Content-Type: ${contentType}`);
       
-      if (!contentType || !contentType.includes('pdf')) {
-        console.warn(`[WARNING] Response does not appear to be a PDF. Content-Type: ${contentType}`);
-      }
       
       // Check content length
       const contentLength = response.headers.get('content-length');
       console.log(`[INFO] Content-Length: ${contentLength || 'unknown'} bytes`);
-      
-      if (contentLength && parseInt(contentLength, 10) < 1000) {
-        console.warn(`[WARNING] PDF file is suspiciously small (${contentLength} bytes)`);
-      }
 
       // Download the PDF content
       const pdfBuffer = await response.arrayBuffer();
       console.log(`[INFO] Downloaded file size: ${pdfBuffer.byteLength} bytes`);
-
-      // Validate the PDF starts with %PDF
-      const pdfHeader = new Uint8Array(pdfBuffer.slice(0, 5));
-      const isPdf = new TextDecoder().decode(pdfHeader).startsWith('%PDF');
       
-      if (!isPdf) {
-        console.error('[ERROR] File does not start with %PDF header. Not a valid PDF file.');
-        throw new Error('Not a valid PDF file (missing PDF header)');
-      }
-
       // Check if the file is too large
       const FILE_SIZE_LIMIT = 200 * 1024 * 1024; // 200MB in bytes
       if (pdfBuffer.byteLength > FILE_SIZE_LIMIT) {

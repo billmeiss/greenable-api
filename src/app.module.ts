@@ -11,6 +11,8 @@ import { EmissionsReportService } from './services/emissions-report.service';
 import { ReportFinderService } from './services/report-finder.service';
 import { CompanyService } from './services/company.service';
 import { ReportProcessingService } from './services/report-processing.service';
+import { RetryUtilsService } from './services/retry-utils.service';
+import { SheetsApiService } from './services/sheets-api.service';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { ReportProcessingService } from './services/report-processing.service';
     ReportFinderService,
     CompanyService,
     ReportProcessingService,
+    RetryUtilsService,
+    SheetsApiService,
   ],
 })
 export class AppModule {}

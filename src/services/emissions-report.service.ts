@@ -259,7 +259,20 @@ export class EmissionsReportService {
   async extractEmissionsReportLinks(url: string, company: string): Promise<string[]> {
     try {
       // Fetch HTML content from URL
-      const response = await axios.get(url);
+      // Add headers to avoid 403
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; GreenableAPI/1.0)',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+          'redirect': 'follow',
+          'Referer': 'https://www.google.com',
+        },
+      });
+      
       const html = response.data;
       
       // Find all links in the HTML

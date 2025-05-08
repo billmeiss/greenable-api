@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GeminiApiService } from './gemini-api.service';
 import { GeminiModelService } from './gemini-model.service';
 import { GoogleAuthService } from './google-auth.service';
+import { SheetsApiService } from './sheets-api.service';
 import { sheets_v4 } from 'googleapis';
 import axios from 'axios';
 import { readFile } from 'fs/promises';
@@ -49,24 +50,16 @@ interface FmpIncomeStatement {
 @Injectable()
 export class CompanyService {
   private readonly logger = new Logger(CompanyService.name);
-  private sheets: sheets_v4.Sheets;
   private readonly FMP_API_BASE_URL = 'https://financialmodelingprep.com/stable';
   private readonly FMP_API_KEY = process.env.FMP_API_KEY;
+  private readonly SPREADSHEET_ID = '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg';
 
   constructor(
     private readonly geminiApiService: GeminiApiService,
     private readonly geminiModelService: GeminiModelService,
     private readonly googleAuthService: GoogleAuthService,
+    private readonly sheetsApiService: SheetsApiService,
   ) {}
-
-  /**
-   * Initialize the Google Sheets client if not already initialized
-   */
-  private async initializeSheetsClient(): Promise<void> {
-    if (!this.sheets) {
-      this.sheets = await this.googleAuthService.getSheetsClient();
-    }
-  }
 
   /**
    * Find the parent company of a given company
@@ -379,8 +372,6 @@ export class CompanyService {
 
       const companiesToExclude = [...existingCompanies.map(company => company.name), ...attempts];
 
-      console.log(companiesToExclude.join(', '))
-
       const result = await this.geminiApiService.handleGeminiCall(
         () => relatedCompaniesModel.generateContent({
           contents: [{ role: 'user', parts: [{ text: `I need to find related competitors of similar size and region to ${companyName}. 
@@ -474,16 +465,13 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     console.log(`[STEP] Getting companies list from Google Sheet`);
     
     try {
-      console.log(`[STEP] Initializing Google Sheets client`);
-      await this.initializeSheetsClient();
+      // Use the SheetsApiService with built-in exponential backoff
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        "'Companies to Request'!A2:A"
+      );
       
-      console.log(`[STEP] Fetching data from 'Companies to Request' sheet`);
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: "'Companies to Request'!A2:A",
-      });
-      
-      const rows = response.data.values || [];
+      const rows = data.values || [];
       const companies = rows.map(row => row[0]).filter(Boolean);
       
       console.log(`[RESULT] Found ${companies.length} companies in spreadsheet`);
@@ -501,17 +489,22 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   async getExistingCompaniesFromSheet(): Promise<any[]> {
     try {
-      console.log(`[STEP] Initializing Google Sheets client`);
-      await this.initializeSheetsClient();
-
-      console.log(`[STEP] Fetching data from 'Companies to Request' sheet`);
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: "'Analysed Data'!A2:G",
-      });
+      console.log(`[STEP] Fetching data from 'Analysed Data' sheet`);
       
-      const rows = response.data.values || [];
-      const companies = rows.map(row => ({ name: row[0], reportingPeriod: row[3], revenueYear: row[4], revenue: row[5], exchangeRateCountry: row[6]})).filter(Boolean);
+      // Use the SheetsApiService with built-in exponential backoff
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        "'Analysed Data'!A2:G"
+      );
+      
+      const rows = data.values || [];
+      const companies = rows.map(row => ({ 
+        name: row[0], 
+        reportingPeriod: row[3], 
+        revenueYear: row[4], 
+        revenue: row[5], 
+        exchangeRateCountry: row[6]
+      })).filter(Boolean);
 
       return companies;
     } catch (error) {
@@ -661,9 +654,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     console.log(`[STEP] Adding data for ${company} to spreadsheet`);
     
     try {
-      console.log(`[STEP] Initializing Google Sheets client`);
-      await this.initializeSheetsClient();
-      
       // Extract the necessary data from emissions
       console.log(`[STEP] Extracting and formatting data for ${company}`);
       const reportingPeriod = emissions.reportingPeriod || 'Unknown';
@@ -792,19 +782,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         companyCategory,
       ];
       
-      // Add the data to the sheet
+      // Add the data to the sheet using SheetsApiService for exponential backoff
       console.log(`[STEP] Adding main data row to 'Analysed Data' sheet for ${company}`);
-      await this.sheets.spreadsheets.values.append({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: 'Analysed Data!A2',
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: {
-          values: [rowData],
-        },
-      });
+      await this.sheetsApiService.appendValues(
+        this.SPREADSHEET_ID,
+        'Analysed Data!A2',
+        [rowData]
+      );
     
-      
       console.log(`[RESULT] Successfully added all data for ${company} to spreadsheets`);
       return true;
     } catch (error) {
@@ -829,27 +814,26 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     try {
       console.log(`[STEP] Updating revenue for ${company} in 'Analysed Data' sheet`);
       
-      // Initialize Google Sheets client
-      await this.initializeSheetsClient();
-
       // Find the row index of the company in the 'Analysed Data' sheet
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: `Analysed Data!A2:E`,
-      });
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!A2:E`
+      );
 
-      const rows = response.data.values || [];
+      const rows = data.values || [];
       const companyIndex = rows.findIndex(row => row[0] === company);
 
+      if (companyIndex === -1) {
+        console.log(`[ERROR] Company ${company} not found in 'Analysed Data' sheet`);
+        return false;
+      }
+
       // Update the cell with the new revenue data and year
-      await this.sheets.spreadsheets.values.update({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: `Analysed Data!E${companyIndex + 2}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [[revenueData.year, revenueData.revenue, revenueData.currency]],
-        },
-      });
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!E${companyIndex + 2}`,
+        [[revenueData.year, revenueData.revenue, revenueData.currency]]
+      );
 
       console.log(`[RESULT] Successfully updated revenue for ${company} in 'Analysed Data' sheet`);
       return true;
@@ -921,9 +905,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     console.log(`[STEP] Adding report URL for ${company} to spreadsheet`);
     
     try {
-      console.log(`[STEP] Initializing Google Sheets client`);
-      await this.initializeSheetsClient();
-      
       // Format the row data
       console.log(`[STEP] Preparing report URL data for ${company}`);
       const rowData = [
@@ -934,15 +915,11 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       
       // Add the data to the sheet
       console.log(`[STEP] Adding report URL data to 'Report URLs' sheet for ${company}`);
-      await this.sheets.spreadsheets.values.append({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: 'Analysed Data!A2',
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: {
-          values: [rowData],
-        },
-      });
+      await this.sheetsApiService.appendValues(
+        this.SPREADSHEET_ID,
+        'Analysed Data!A2',
+        [rowData]
+      );
       
       console.log(`[RESULT] Successfully added report URL for ${company} to spreadsheet`);
       return true;
@@ -971,27 +948,26 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     try {
       console.log(`[STEP] Updating country for ${company} in 'Analysed Data' sheet`);
       
-      // Initialize Google Sheets client
-      await this.initializeSheetsClient();
-
       // Find the row index of the company in the 'Analysed Data' sheet
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: `Analysed Data!A2:E`,
-      });
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!A2:E`
+      );
 
-      const rows = response.data.values || [];
+      const rows = data.values || [];
       const companyIndex = rows.findIndex(row => row[0] === company);
 
+      if (companyIndex === -1) {
+        console.log(`[ERROR] Company ${company} not found in 'Analysed Data' sheet`);
+        return false;
+      }
+
       // Update the cell with the new country data
-      await this.sheets.spreadsheets.values.update({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: `Analysed Data!AD${companyIndex + 2}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [[country]],
-        },
-      });
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!AD${companyIndex + 2}`,
+        [[country]]
+      );
 
       console.log(`[RESULT] Successfully updated country for ${company} in 'Analysed Data' sheet`);
       return true;
@@ -1005,27 +981,26 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     try {
       console.log(`[STEP] Updating category for ${company} in 'Analysed Data' sheet`);
       
-      // Initialize Google Sheets client
-      await this.initializeSheetsClient();
-      
       // Find the row index of the company in the 'Analysed Data' sheet
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: `Analysed Data!A2:E`,
-      });
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!A2:E`
+      );
 
-      const rows = response.data.values || [];
+      const rows = data.values || [];
       const companyIndex = rows.findIndex(row => row[0] === company);
 
+      if (companyIndex === -1) {
+        console.log(`[ERROR] Company ${company} not found in 'Analysed Data' sheet`);
+        return false;
+      }
+
       // Update the cell with the new category data
-      await this.sheets.spreadsheets.values.update({
-        spreadsheetId: '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg',
-        range: `Copy of Final V1!AE${companyIndex + 2}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [[category]],
-        },
-      });
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Copy of Final V1!AE${companyIndex + 2}`,
+        [[category]]
+      );
 
       console.log(`[RESULT] Successfully updated category for ${company} in 'Analysed Data' sheet`);
       return true;
@@ -1039,32 +1014,38 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
    * Add attempt to sheet
    */
   async addAttemptToSheet(company: string, processedCompanyName: string): Promise<void> {
-    const sheet = await this.googleAuthService.getSheetsClient();
-    const sheetId = '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg';
     const sheetName = 'ESG Report Attempts';
     const value = [company, processedCompanyName, new Date().toISOString().split('T')[0]];
-    await sheet.spreadsheets.values.append({
-      spreadsheetId: sheetId,
-      range: `${sheetName}!A1`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [value],
-      },
-    });
+    
+    try {
+      await this.sheetsApiService.appendValues(
+        this.SPREADSHEET_ID,
+        `${sheetName}!A1`,
+        [value]
+      );
+      console.log(`[DETAIL] Added attempt record for ${company}`);
+    } catch (error) {
+      console.log(`[ERROR] Error adding attempt to sheet for ${company}: ${error.message}`);
+    }
   }
 
   /**
    * Get attempts from sheet
    */
   async getAttemptsFromSheet(): Promise<any[]> {
-    const sheet = await this.googleAuthService.getSheetsClient();
-    const sheetId = '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg';
     const sheetName = 'ESG Report Attempts';
-    const response = await sheet.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `${sheetName}!A1:A`,
-    });
-    const attempts = response.data.values || [];
-    return attempts.map(attempt => attempt[0]);
+    
+    try {
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `${sheetName}!A1:A`
+      );
+      
+      const attempts = data.values || [];
+      return attempts.map(attempt => attempt[0]);
+    } catch (error) {
+      console.log(`[ERROR] Error getting attempts from sheet: ${error.message}`);
+      return [];
+    }
   }
 }

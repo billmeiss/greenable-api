@@ -44,7 +44,12 @@ export class AppService {
     this.logger.log(`Processing report for company: ${name} with provided URL: ${reportUrl}`);
     
     try {
-      return await this.reportProcessingService.processCompany(name);
+      const result = await this.reportProcessingService.processCompany(name);
+      return { 
+        success: !!result, 
+        processedCompany: result || name,
+        message: result ? 'Successfully processed company' : 'Company processing did not result in data extraction'
+      };
     } catch (error) {
       this.logger.error(`Error processing company ${name}: ${error.message}`);
       return { success: false, message: error.message };

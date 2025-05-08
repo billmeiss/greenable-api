@@ -4,9 +4,30 @@ import { EmissionsReportService } from './emissions-report.service';
 import { ReportFinderService } from './report-finder.service';
 import { CompanyService } from './company.service';
 
+// Define the BatchLogger interface
+interface BatchLogger {
+  log(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+}
+
 @Injectable()
 export class ReportProcessingService {
   private readonly logger = new Logger(ReportProcessingService.name);
+  private readonly colors = [
+    '\x1b[31m', // Red
+    '\x1b[32m', // Green
+    '\x1b[33m', // Yellow
+    '\x1b[34m', // Blue
+    '\x1b[35m', // Magenta
+    '\x1b[36m', // Cyan
+    '\x1b[91m', // Bright Red
+    '\x1b[92m', // Bright Green
+    '\x1b[93m', // Bright Yellow
+    '\x1b[94m', // Bright Blue
+  ];
+  private readonly resetColor = '\x1b[0m';
+  private readonly mainColor = '\x1b[97m'; // Bright white
 
   constructor(
     private readonly geminiApiService: GeminiApiService,
@@ -20,39 +41,22 @@ export class ReportProcessingService {
    */
   async processCompanyReports(): Promise<string> {
     try {
-      this.logger.log('Starting company report processing');
+      const mainLogger = this.createLogger('MAIN', this.mainColor);
+      mainLogger.log('Starting company report processing');
       
-      // Get list of companies from the spreadsheet
-      const companies = await this.companyService.getCompaniesFromSheet();
-      
-      if (!companies || companies.length === 0) {
+      // Get and deduplicate companies from the spreadsheet
+      const companies = await this.getUniqueCompanies();
+      if (companies.length === 0) {
         return 'No companies found in the spreadsheet.';
       }
       
-      this.logger.log(`Found ${companies.length} companies to process`);
+      mainLogger.log(`Found ${companies.length} unique companies to process`);
       
-      // Process each company
-      for (const company of companies) {
-        const relatedCompanies = await this.companyService.getRelatedCompanies(company);
-        const doesCompanyExist = await this.companyService.doesCompanyExist(company);
-
-        if (doesCompanyExist) {
-          this.logger.log(`Company ${company} already exists, skipping...`);
-          continue;
-        }
-
-        this.logger.log(`Processing base company: ${company}`);
-
-        const processedCompanyName = await this.processCompany(company);
-        await this.companyService.addAttemptToSheet(company, processedCompanyName);
-        
-        for (const relatedCompany of relatedCompanies) {
-          const processedRelatedCompanyName = await this.processCompany(relatedCompany);
-          await this.companyService.addAttemptToSheet(relatedCompany, processedRelatedCompanyName);
-        }
-      }
+      // Process all companies in parallel chunks
+      const totalProcessed = await this.processCompaniesInParallelChunks(companies, 5, mainLogger);
       
-      return `Processed ${companies.length} companies successfully.`;
+      mainLogger.log(`Completed processing of all chunks. Total companies processed: ${totalProcessed}`);
+      return `Processed ${totalProcessed} companies successfully.`;
     } catch (error) {
       this.logger.error(`Error in processCompanyReports: ${error.message}`);
       return `Error processing companies: ${error.message}`;
@@ -60,37 +64,235 @@ export class ReportProcessingService {
   }
 
   /**
+   * Fetch and deduplicate companies from the spreadsheet
+   */
+  private async getUniqueCompanies(): Promise<string[]> {
+    const companies = await this.companyService.getCompaniesFromSheet();
+    return companies ? [...new Set(companies)] : [];
+  }
+
+  /**
+   * Process companies in parallel chunks
+   */
+  private async processCompaniesInParallelChunks(
+    companies: string[], 
+    numChunks: number,
+    mainLogger: BatchLogger
+  ): Promise<number> {
+    const chunks = this.divideCompaniesIntoChunks(companies, numChunks);
+    mainLogger.log(`Divided ${companies.length} companies into ${chunks.length} chunks for parallel processing`);
+    
+    // Process each chunk in parallel
+    const chunkResults = await Promise.all(
+      chunks.map((chunk, index) => this.processCompanyChunk(chunk, index))
+    );
+    
+    // Return total processed companies
+    return chunkResults.reduce((sum, count) => sum + count, 0);
+  }
+
+  /**
+   * Create a colored logger for a specific batch or context
+   */
+  private createLogger(prefix: string, color: string): BatchLogger {
+    const coloredPrefix = `${color}[${prefix}]${this.resetColor}`;
+    
+    return {
+      log: (message: string) => this.logger.log(`${coloredPrefix} ${message}`),
+      warn: (message: string) => this.logger.warn(`${coloredPrefix} ${message}`),
+      error: (message: string) => this.logger.error(`${coloredPrefix} ${message}`)
+    };
+  }
+
+  /**
+   * Divide companies array into specified number of chunks
+   */
+  private divideCompaniesIntoChunks(companies: string[], numChunks: number): string[][] {
+    // Ensure we're creating at most the requested number of chunks
+    numChunks = Math.min(numChunks, companies.length);
+    
+    const result: string[][] = Array.from({ length: numChunks }, () => []);
+    
+    // Distribute companies evenly across chunks
+    companies.forEach((company, index) => {
+      const chunkIndex = index % numChunks;
+      result[chunkIndex].push(company);
+    });
+
+    console.log(result);
+    
+    return result;
+  }
+
+  /**
+   * Process a chunk of companies in parallel
+   */
+  private async processCompanyChunk(companies: string[], chunkIndex: number): Promise<number> {
+    const batchLogger = this.createBatchLogger(chunkIndex);
+    batchLogger.log(`Starting processing of chunk with ${companies.length} companies`);
+    
+    let processedCount = 0;
+    
+    for (const company of companies) {
+      try {
+        const companyName = await this.processCompany(company);
+        if (companyName) {
+          processedCount += 1;
+        }
+      } catch (error) {
+        batchLogger.error(`Error processing company ${company}: ${error.message}`);
+      }
+    }
+    
+    batchLogger.log(`Finished processing chunk, processed ${processedCount} companies`);
+    return processedCount;
+  }
+
+  /**
+   * Create a batch-specific logger
+   */
+  private createBatchLogger(batchIndex: number): BatchLogger {
+    const batchColor = this.colors[batchIndex % this.colors.length];
+    return this.createLogger(`BATCH ${batchIndex + 1}`, batchColor);
+  }
+
+  /**
+   * Process a base company and any related companies
+   */
+  private async processBaseCompany(company: string, batchLogger: BatchLogger): Promise<number> {
+    const relatedCompanies = await this.companyService.getRelatedCompanies(company);
+    const doesCompanyExist = await this.companyService.doesCompanyExist(company);
+    
+    if (doesCompanyExist) {
+      batchLogger.log(`Company ${company} already exists, skipping...`);
+      return 0;
+    }
+    
+    batchLogger.log(`Processing base company: ${company}`);
+    
+    // Process main company
+    const processedCompanyName = await this.processCompanyWithContext(company, batchLogger);
+    await this.companyService.addAttemptToSheet(company, processedCompanyName);
+    
+    let processedCount = 1;
+    
+    // Process related companies
+    for (const relatedCompany of relatedCompanies) {
+      const processedRelatedCompanyName = await this.processCompanyWithContext(relatedCompany, batchLogger);
+      await this.companyService.addAttemptToSheet(relatedCompany, processedRelatedCompanyName);
+      processedCount++;
+    }
+    
+    return processedCount;
+  }
+  
+  /**
+   * Process a single company with batch context
+   */
+  private async processCompanyWithContext(company: string, batchLogger: BatchLogger): Promise<string> {
+    // Store original log methods
+    const originalLogMethod = this.logger.log;
+    const originalWarnMethod = this.logger.warn;
+    const originalErrorMethod = this.logger.error;
+    
+    // Override logger methods for this specific company processing
+    this.logger.log = batchLogger.log;
+    this.logger.warn = batchLogger.warn;
+    this.logger.error = batchLogger.error;
+    
+    try {
+      // Process the company with the batch-specific logger
+      return await this.processCompany(company);
+    } finally {
+      // Always restore original logger methods when done
+      this.logger.log = originalLogMethod;
+      this.logger.warn = originalWarnMethod;
+      this.logger.error = originalErrorMethod;
+    }
+  }
+
+  /**
    * Process a single company
    */
-  async processCompany(company: string): Promise<string> {
+  async processCompany(company: string): Promise<string | null> {
     try {
       this.logger.log(`Processing company: ${company}`);
       
       // 1. Check for parent company
       const parentCompany = await this.companyService.findParentCompany(company);
       
+      // Skip parent company logic if parent is same as company (prevent recursion)
+      if (!parentCompany || parentCompany === company) {
+        const reportData = await this.getCompanyESGReportData(company);
+        
+        if (!reportData) {
+          this.logger.warn(`No report found for ${company}`);
+          return null;
+        }
+        
+        // Check if emissions extraction timed out
+        if (reportData.emissions && reportData.emissions.timedOut) {
+          this.logger.warn(`TIMEOUT: Emissions extraction for ${company} exceeded 5 minutes.`);
+          this.logger.warn(`MANUAL CHECK NEEDED: Please manually check emissions data at: ${reportData.reportUrl}`);
+          
+          // Add timeout information to spreadsheet
+          await this.companyService.addCompanyToSheet(
+            company,
+            { timedOut: true, reportUrl: reportData.reportUrl },
+            reportData.reportUrl,
+            null,
+            null
+          );
+          
+          return company; // Return company name to indicate processing completed
+        }
+
+        const doesCompanyExist = await this.companyService.doesCompanyExist(reportData.emissions.company?.name);
+
+        if (doesCompanyExist) {
+          this.logger.log(`Company ${reportData.emissions.company?.name} already exists, skipping...`);
+          return null;
+        }
+        
+        // 3. Get company revenue data for the same reporting period as emissions
+        const reportingPeriod = reportData.emissions?.reportingPeriod || null;
+        const revenueData = await this.companyService.getCompanyRevenue(reportData.emissions.company?.name ?? company, reportingPeriod);
+        const countryData = await this.companyService.determineCompanyCountry(reportData.emissions.company?.name ?? company);
+        const companyCategory = await this.companyService.getCompanyCategory(reportData.emissions.company?.name ?? company);
+        
+        // 5. Add data to spreadsheet
+        await this.companyService.addCompanyToSheet(
+          reportData.emissions.company?.name ?? company,
+          reportData.emissions,
+          reportData.reportUrl,
+          revenueData,
+          companyCategory,
+          countryData
+        );
+        
+        this.logger.log(`Successfully processed ${company}`);
+        return reportData.emissions.company?.name ?? company;
+      } 
+      
+      // Handle parent company case
       const doesParentCompanyExist = await this.companyService.doesCompanyExist(parentCompany);
       
-      // If parent company is different and not null, use parent company instead
-      const companyToProcess = parentCompany && !doesParentCompanyExist && parentCompany !== company 
-        ? parentCompany 
-        : company;
-
-        console.log(doesParentCompanyExist, companyToProcess, parentCompany, company);
-      
-      if (parentCompany && !doesParentCompanyExist && parentCompany !== company) {
-        this.logger.log(`Using parent company ${parentCompany} for ${company}`);
+      if (doesParentCompanyExist) {
+        this.logger.log(`Parent company ${parentCompany} already exists, using original company`);
+        return null;
       }
       
-      // 2. Get current year ESG report
-      const currentYear = new Date().getFullYear();
+      this.logger.log(`Using parent company ${parentCompany} for ${company}`);
+      
+      // Process the parent company instead
+      const companyToProcess = parentCompany;
       
       // Try to find the latest report
       const reportData = await this.getCompanyESGReportData(companyToProcess);
       
       if (!reportData) {
         this.logger.warn(`No report found for ${companyToProcess}`);
-        return;
+        return null;
       }
       
       // Check if emissions extraction timed out
@@ -107,14 +309,14 @@ export class ReportProcessingService {
           null
         );
         
-        return; // Skip further processing for this company
+        return company; // Return original company name to indicate processing completed
       }
 
       const doesCompanyExist = await this.companyService.doesCompanyExist(reportData.emissions.company?.name);
 
       if (doesCompanyExist) {
         this.logger.log(`Company ${reportData.emissions.company?.name} already exists, skipping...`);
-        return;
+        return null;
       }
       
       // 3. Get company revenue data for the same reporting period as emissions
@@ -133,10 +335,11 @@ export class ReportProcessingService {
         countryData
       );
       
-      this.logger.log(`Successfully processed ${company}`);
+      this.logger.log(`Successfully processed ${company} as ${companyToProcess}`);
       return reportData.emissions.company?.name ?? companyToProcess;
     } catch (error) {
       this.logger.error(`Error processing company ${company}: ${error.message}`);
+      return null; // Return null in case of error
     }
   }
 
