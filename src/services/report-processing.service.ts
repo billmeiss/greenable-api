@@ -139,6 +139,7 @@ export class ReportProcessingService {
         if (companyName) {
           processedCount += 1;
         }
+        this.companyService.addAttemptToSheet(company, companyName);
       } catch (error) {
         batchLogger.error(`Error processing company ${company}: ${error.message}`);
       }
@@ -309,7 +310,7 @@ export class ReportProcessingService {
           null
         );
         
-        return company; // Return original company name to indicate processing completed
+        return `Emissions extraction timed out for ${companyToProcess}`; // Return original company name to indicate processing completed
       }
 
       const doesCompanyExist = await this.companyService.doesCompanyExist(reportData.emissions.company?.name);
