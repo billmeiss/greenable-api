@@ -143,11 +143,14 @@ export class ReportProcessingService {
     
     for (const company of companies) {
       try {
-        const companyName = await this.processCompany(company);
-        if (companyName) {
-          processedCount += 1;
+        const relatedCompanies = await this.companyService.getRelatedCompanies(company);
+        for (const relatedCompany of [company, ...relatedCompanies]) {
+          const companyName = await this.processCompany(relatedCompany);
+          this.companyService.addAttemptToSheet(company, companyName);
+          if (companyName) {
+            processedCount += 1;
+          }
         }
-        this.companyService.addAttemptToSheet(company, companyName);
       } catch (error) {
         batchLogger.error(`Error processing company ${company}: ${error.message}`);
       }
