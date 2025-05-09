@@ -39,7 +39,7 @@ export class ReportProcessingService {
   /**
    * Process ESG reports for all companies in the spreadsheet
    */
-  async processCompanyReports(): Promise<string> {
+  async processCompanyReports({ withChunking = false }: { withChunking?: boolean }): Promise<string> {
     try {
       const mainLogger = this.createLogger('MAIN', this.mainColor);
       mainLogger.log('Starting company report processing');
@@ -51,12 +51,20 @@ export class ReportProcessingService {
       }
       
       mainLogger.log(`Found ${companies.length} unique companies to process`);
-      
-      // Process all companies in parallel chunks
-      const totalProcessed = await this.processCompaniesInParallelChunks(companies, 5, mainLogger);
-      
-      mainLogger.log(`Completed processing of all chunks. Total companies processed: ${totalProcessed}`);
-      return `Processed ${totalProcessed} companies successfully.`;
+
+      if (withChunking) {
+        // Process all companies in parallel chunks
+        const totalProcessed = await this.processCompaniesInParallelChunks(companies, 5, mainLogger);
+        
+        mainLogger.log(`Completed processing of all chunks. Total companies processed: ${totalProcessed}`);
+        return `Processed ${totalProcessed} companies successfully.`;
+      } else {
+        // Process all companies in parallel
+        const totalProcessed = await this.processCompaniesInParallelChunks(companies, 1, mainLogger);
+        
+        mainLogger.log(`Completed processing of all chunks. Total companies processed: ${totalProcessed}`);
+        return `Processed ${totalProcessed} companies successfully.`;
+      }
     } catch (error) {
       this.logger.error(`Error in processCompanyReports: ${error.message}`);
       return `Error processing companies: ${error.message}`;
@@ -155,61 +163,6 @@ export class ReportProcessingService {
   private createBatchLogger(batchIndex: number): BatchLogger {
     const batchColor = this.colors[batchIndex % this.colors.length];
     return this.createLogger(`BATCH ${batchIndex + 1}`, batchColor);
-  }
-
-  /**
-   * Process a base company and any related companies
-   */
-  private async processBaseCompany(company: string, batchLogger: BatchLogger): Promise<number> {
-    const relatedCompanies = await this.companyService.getRelatedCompanies(company);
-    const doesCompanyExist = await this.companyService.doesCompanyExist(company);
-    
-    if (doesCompanyExist) {
-      batchLogger.log(`Company ${company} already exists, skipping...`);
-      return 0;
-    }
-    
-    batchLogger.log(`Processing base company: ${company}`);
-    
-    // Process main company
-    const processedCompanyName = await this.processCompanyWithContext(company, batchLogger);
-    await this.companyService.addAttemptToSheet(company, processedCompanyName);
-    
-    let processedCount = 1;
-    
-    // Process related companies
-    for (const relatedCompany of relatedCompanies) {
-      const processedRelatedCompanyName = await this.processCompanyWithContext(relatedCompany, batchLogger);
-      await this.companyService.addAttemptToSheet(relatedCompany, processedRelatedCompanyName);
-      processedCount++;
-    }
-    
-    return processedCount;
-  }
-  
-  /**
-   * Process a single company with batch context
-   */
-  private async processCompanyWithContext(company: string, batchLogger: BatchLogger): Promise<string> {
-    // Store original log methods
-    const originalLogMethod = this.logger.log;
-    const originalWarnMethod = this.logger.warn;
-    const originalErrorMethod = this.logger.error;
-    
-    // Override logger methods for this specific company processing
-    this.logger.log = batchLogger.log;
-    this.logger.warn = batchLogger.warn;
-    this.logger.error = batchLogger.error;
-    
-    try {
-      // Process the company with the batch-specific logger
-      return await this.processCompany(company);
-    } finally {
-      // Always restore original logger methods when done
-      this.logger.log = originalLogMethod;
-      this.logger.warn = originalWarnMethod;
-      this.logger.error = originalErrorMethod;
-    }
   }
 
   /**

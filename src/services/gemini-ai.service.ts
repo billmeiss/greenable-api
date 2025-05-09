@@ -36,6 +36,7 @@ export class GeminiAiService {
           'Accept-Language': 'en-US,en;q=0.9',
           'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive',
+          'credentials': 'include',
           'Upgrade-Insecure-Requests': '1',          
         },
         redirect: 'follow' // Follow redirects automatically

@@ -22,12 +22,12 @@ export class AppService {
   /**
    * Process all company reports in the spreadsheet
    */
-  async processCompanyReports(): Promise<string> {
+  async processCompanyReports({ withChunking = false }: { withChunking?: boolean }): Promise<string> {
     this.logger.log('Starting company reports processing from AppService');
     
     try {
       // Delegate to the ReportProcessingService
-      return await this.reportProcessingService.processCompanyReports();
+      return await this.reportProcessingService.processCompanyReports({ withChunking });
     } catch (error) {
       this.logger.error(`Error in AppService.processCompanyReports: ${error.message}`);
       return `Error processing company reports: ${error.message}`;

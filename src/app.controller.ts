@@ -7,7 +7,7 @@ export class AppController {
 
   @Get()
   getCompanyESGReports() {
-    return this.appService.processCompanyReports();
+    return this.appService.processCompanyReports({ withChunking: false });
   }
 
   @Post('/update-revenues')
