@@ -201,14 +201,14 @@ export class ReportProcessingService {
             null
           );
           
-          return company; // Return company name to indicate processing completed
+          return `Emissions extraction timed out for ${company}`; // Return company name to indicate processing completed
         }
 
         const doesCompanyExist = await this.companyService.doesCompanyExist(reportData.emissions.company?.name);
 
         if (doesCompanyExist) {
           this.logger.log(`Company ${reportData.emissions.company?.name} already exists, skipping...`);
-          return null;
+          return `Company ${reportData.emissions.company?.name} already exists, skipping...`;
         }
         
         // 3. Get company revenue data for the same reporting period as emissions
@@ -236,7 +236,7 @@ export class ReportProcessingService {
       
       if (doesParentCompanyExist) {
         this.logger.log(`Parent company ${parentCompany} already exists, using original company`);
-        return null;
+        return `Parent company ${parentCompany} already exists, using original company`;
       }
       
       this.logger.log(`Using parent company ${parentCompany} for ${company}`);
@@ -249,7 +249,7 @@ export class ReportProcessingService {
       
       if (!reportData) {
         this.logger.warn(`No report found for ${companyToProcess}`);
-        return null;
+        return `No report found for ${companyToProcess}`;
       }
       
       // Check if emissions extraction timed out
@@ -273,7 +273,7 @@ export class ReportProcessingService {
 
       if (doesCompanyExist) {
         this.logger.log(`Company ${reportData.emissions.company?.name} already exists, skipping...`);
-        return null;
+        return `Company ${reportData.emissions.company?.name} already exists, skipping...`;
       }
       
       // 3. Get company revenue data for the same reporting period as emissions
