@@ -293,7 +293,7 @@ export class ReportProcessingService {
       return reportData.emissions.company?.name ?? companyToProcess;
     } catch (error) {
       this.logger.error(`Error processing company ${company}: ${error.message}`);
-      return null; // Return null in case of error
+      return error.message; // Return null in case of error
     }
   }
 
