@@ -73,9 +73,9 @@ export class CompanyService {
         
         Rules:
         - If ${companyName} is already the top-level parent company, return "${companyName}" as the parent
-        - If ${companyName} is a subsidiary, identify its ultimate parent company
         - If the parent company is a government entity, return "${companyName}" as the parent
         - Use reliable, recent sources for your determination
+        - If the parent company is an investment company or fund or private equity firm, return "${companyName}" as the parent
         
         Return your answer in the following JSON format only:
         
