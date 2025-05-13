@@ -150,7 +150,7 @@ export class CompanyService {
     // call gemini to check if companyName is in existingCompanies
     const result = await this.geminiApiService.handleGeminiCall(
       () => this.geminiModelService.getModel('companyNameChecker').generateContent({
-        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} in the following list? ${existingCompanies.map(company => company.name).join(', ')}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} already a company in the following list? ${existingCompanies.map(company => company.name).join(', ')}` }] }],
       })
     );
 
@@ -661,6 +661,12 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Extract the standard unit used for emissions
       const emissionsUnit = emissions.standardUnit || 'tCO2e';
       console.log(`[DETAIL] Emissions unit: ${emissionsUnit}`);
+
+      // Extract the third party assurance data
+      const thirdPartyAssurance = emissions.thirdPartyAssurance || {};
+      const thirdPartyAssuranceCompany = thirdPartyAssurance.company || null;
+      const thirdPartyAssuranceNotes = thirdPartyAssurance.notes || null;
+      console.log(`[DETAIL] Third party assurance: ${thirdPartyAssuranceCompany || 'Not available'}, Notes: ${thirdPartyAssuranceNotes || 'N/A'}`);
       
       // Prepare scope 1 emissions
       const scope1 = emissions.scope1 || {};
@@ -780,6 +786,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         revenueSource,
         country,
         companyCategory,
+        thirdPartyAssuranceCompany,
+        `Scope 1: ${scope1Notes} Scope 2: ${scope2Notes} Scope 3: ${scope3Notes} Third Party Assurance: ${thirdPartyAssuranceNotes}`
       ];
       
       // Add the data to the sheet using SheetsApiService for exponential backoff

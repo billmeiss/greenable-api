@@ -68,6 +68,10 @@ export class EmissionsReportService {
               "1": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
               ... (additional categories as needed)
             }
+          },
+          "thirdPartyAssurance": {
+            "company": "string",
+            "notes": "string"
           }
         }
         
@@ -80,6 +84,7 @@ export class EmissionsReportService {
         - Scope 1 emissions
         - Scope 2 emissions (both location-based and market-based if available)
         - Scope 3 emissions (total and breakdown by categories if available)
+        - Third party assurance (if available)
       
         
         Look for tables, charts, and text that explicitly mention greenhouse gas emissions.
@@ -113,6 +118,8 @@ export class EmissionsReportService {
         Note any potential issues, missing data, or uncertainties.
 
         Fetch the company name from the report.
+
+        If the report contains a third party assurance statement, extract the company name that provided the assurance and the notes.
 
         You must convert all values to the standard unit of tons of CO2 equivalent.
       `;
