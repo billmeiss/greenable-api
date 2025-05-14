@@ -113,6 +113,7 @@ export class EmissionsReportService {
         - Whether the category is explicitly included in reporting (even if no value is given)
         - Any notes or explanations about the category
         - If categories are excluded, note the reasons provided
+        - In your notes be critical of any categories that are excluded or of their calculations
         
         Assign confidence scores (0-10) to each data point based on clarity and reliability.
         Note any potential issues, missing data, or uncertainties.
