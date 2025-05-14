@@ -119,7 +119,7 @@ export class EmissionsReportService {
 
         Fetch the company name from the report.
 
-        If the report contains a third party assurance statement, extract the company name that provided the assurance and the notes.
+        If the report contains a third party assurance statement, extract the company name that provided the assurance and the notes. If no third party assurance is found, return null for the third party assurance company and notes.
 
         You must convert all values to the standard unit of tons of CO2 equivalent.
       `;
