@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createPartFromUri, GoogleGenAI, Part, Type } from '@google/genai';
-import { ConfigService } from '@nestjs/config';
+// import { ConfigService } from '@nestjs/config';
 import fetch from 'node-fetch';
 import { GeminiModelService } from './gemini-model.service';
 
@@ -8,8 +8,9 @@ import { GeminiModelService } from './gemini-model.service';
 export class GeminiAiService {
   private ai: GoogleGenAI;
 
-  constructor(private configService: ConfigService, private geminiModelService: GeminiModelService) {
-    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+  constructor(private geminiModelService: GeminiModelService) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    console.log({apiKey});
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY not found in environment variables');
     }
@@ -110,6 +111,7 @@ export class GeminiAiService {
 
       return getFile;
     } catch (error) {
+      console.log(process.env.GEMINI_API_KEY, 'here');
       console.error('[ERROR] PDF upload/processing failed:', error);
       throw error;
     }
