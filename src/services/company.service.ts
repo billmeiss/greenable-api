@@ -150,7 +150,7 @@ export class CompanyService {
     // call gemini to check if companyName is in existingCompanies
     const result = await this.geminiApiService.handleGeminiCall(
       () => this.geminiModelService.getModel('companyNameChecker').generateContent({
-        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} already a company in the following list? Some may have similar names but are different, so make sure you check the name of each company in the list. ${existingCompanies.map(company => company.name).join(', ')}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} already a company in the following list? Some may have similar names but are different, so if you find a company with similar names, check to see if they are actually different companies or just different ways of writing the same company. ${existingCompanies.map(company => company.name).join(', ')}` }] }],
       })
     );
 
