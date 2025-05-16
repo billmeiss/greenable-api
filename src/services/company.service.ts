@@ -150,7 +150,7 @@ export class CompanyService {
     // call gemini to check if companyName is in existingCompanies
     const result = await this.geminiApiService.handleGeminiCall(
       () => this.geminiModelService.getModel('companyNameChecker').generateContent({
-        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} already a company in the following list? Some may have similar names but are different, so if you find a company with similar names, check to see if they are actually different companies or just different ways of writing the same company. ${existingCompanies.map(company => company.name).join(', ')}` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} already a company in the following list? ${existingCompanies.map(company => company.name).join(', ')}` }] }],
       })
     );
 
@@ -175,7 +175,7 @@ export class CompanyService {
     const normalized2 = normalize(company2);
     
     // Check if one is a substring of the other or if they're very similar
-    return normalized1 === normalized2;
+    return normalized1.includes(normalized2) || normalized2.includes(normalized1);
   }
 
   /**
