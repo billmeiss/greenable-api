@@ -68,13 +68,10 @@ export class GeminiApiService {
         // Check for rate limit errors or server errors
         const isRateLimitError = error.message?.includes('429') || 
                                 error.message?.includes('rate limit') ||
-                                error.message?.includes('quota exceeded');
-        
-        const isServerError = error.message?.includes('5') || 
-                             error.message?.includes('server error');
-                             
-        // Kill the process if we get a 500 or 429 error
-        if (isRateLimitError || isServerError) {
+                                error.message?.includes('quota exceeded') || error.message?.includes('RESOURCE_EXHAUSTED');
+                                     
+        // Kill the process if we get a rate limit error
+        if (isRateLimitError) {
           this.logger.error(`Fatal error from Gemini API: ${error.message}. Killing process.`);
           process.exit(1);
         }
