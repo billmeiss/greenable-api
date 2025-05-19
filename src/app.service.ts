@@ -117,6 +117,19 @@ export class AppService {
       await this.companyService.updateCompanyCategory(name, category);
     }
   }
+
+  async updateAuditedCompanies(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    for (const company of companies) {
+      const result = await this.companyService.getCompanyAudited(company);
+      console.log(result);
+      if (!result) {
+        console.log(`[ERROR] Failed to update audited companies for ${company.name}`);
+        continue;
+      }
+      await this.companyService.updateCompanyAudited(company.name, result.thirdPartyAssurance, result.notes);
+    }
+  }
 }
 
 

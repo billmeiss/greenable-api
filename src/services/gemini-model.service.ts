@@ -269,6 +269,20 @@ export class GeminiModelService {
             The reportUrl field is required and must be a string.`
     };
 
+    this.modelConfigs.auditedCompanies = {
+      model: 'gemini-2.5-flash-preview-04-17',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+      },
+      systemInstruction: `You will return responses in this JSON format:
+                      "thirdPartyAssurance": {
+                        "company": "The company that audited the report",
+                        "notes": "Additional information about the audited company"
+                      }, 
+                      "notes": "Additional information about how scope 1, 2 and 3 emissions were calculated"`
+    }
+
     // ESG model
     this.modelConfigs.esg = {
       model: 'gemini-2.5-pro-preview-05-06',

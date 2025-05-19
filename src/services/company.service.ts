@@ -6,6 +6,7 @@ import { SheetsApiService } from './sheets-api.service';
 import { sheets_v4 } from 'googleapis';
 import axios from 'axios';
 import { readFile } from 'fs/promises';
+import { GeminiAiService } from './gemini-ai.service';
 
 // Add type definition for Gemini API response
 interface GeminiResponse {
@@ -56,6 +57,7 @@ export class CompanyService {
 
   constructor(
     private readonly geminiApiService: GeminiApiService,
+    private readonly geminiAiService: GeminiAiService,
     private readonly geminiModelService: GeminiModelService,
     private readonly googleAuthService: GoogleAuthService,
     private readonly sheetsApiService: SheetsApiService,
@@ -250,6 +252,62 @@ export class CompanyService {
       this.logger.error(`Error getting income statement for ${symbol}: ${error.message}`);
       return [];
     }
+  }
+
+  async updateCompanyAudited(companyName: string, thirdPartyAssurance: any, notes: string): Promise<void> {
+    const existingCompanies = await this.getExistingCompaniesFromSheet();
+
+    // Find the row index of the company in the 'Analysed Data' sheet
+    const data = await this.sheetsApiService.getValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!A2:E`
+    );
+
+    const rows = data.values || [];
+    const companyIndex = rows.findIndex(row => row[0] === companyName);
+
+    if (companyIndex === -1) {
+      console.log(`[ERROR] Company ${companyName} not found in 'Analysed Data' sheet`);
+      return  ;
+    }
+
+    await this.sheetsApiService.updateValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!AF:AG${companyIndex + 2}`,
+      [[thirdPartyAssurance.company, notes]]
+    );
+  
+  }
+
+  /**
+   * Get company audited data
+   */
+  async getCompanyAudited(companyData: any): Promise<any> {
+    const { reportUrl } = companyData;
+
+    const prompt = `
+      I need you to find if the company has a third party assurance report.
+      If the report contains a third party assurance statement, extract the company name that provided the assurance and the notes. If no third party assurance is found, return null for the third party assurance company and notes. If the report has undergone third party assurance but no assurance company is named, return 'Undergone, No name provided' for the third party assurance company and the notes from the report.
+      The response should be in the following JSON format:
+      {
+        "thirdPartyAssurance": {
+          "company": "The company that audited the report",
+          "notes": "Additional information about the audited company"
+        },
+        "notes": "Additional information about the calculation of scope 1, 2 and 3 emissions (do not state the values) and the third party assurance report. Please note if any categories are not included in the report."
+      }
+    `;
+
+    const result = await this.geminiApiService.handleGeminiCall(
+      () => this.geminiAiService.processPDF(reportUrl, prompt, 'auditedCompanies'),
+      2,
+      1000,
+      10 * 60 * 1000
+    );
+    
+    const parsedResponse = this.geminiApiService.safelyParseJson(result);
+
+    return parsedResponse;
   }
 
   /**
@@ -502,6 +560,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const rows = data.values || [];
       const companies = rows.map(row => ({ 
         name: row[0], 
+        reportUrl: row[2],
         reportingPeriod: row[3], 
         revenueYear: row[4], 
         revenue: row[5], 

@@ -156,8 +156,6 @@ export class GeminiAiService {
         },
       });
 
-      console.log(file.name);
-
       await this.deleteFile(file.name);
 
       return response.text;

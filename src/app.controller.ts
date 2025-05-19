@@ -41,4 +41,9 @@ export class AppController {
       reportUrl
     });
   }
+
+  @Post('/audited-companies')
+  updateAuditedCompanies() {
+    return this.appService.updateAuditedCompanies();
+  }
 }
