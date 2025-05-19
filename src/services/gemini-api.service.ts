@@ -62,19 +62,19 @@ export class GeminiApiService {
         // Check if we've reached max retries
         if (retries >= maxRetries) {
           this.logger.error(`Maximum retries (${maxRetries}) reached for Gemini API call`);
+          // Check for rate limit errors or server errors
+          const isRateLimitError = 
+          error.message?.includes('rate limit') ||
+          error.message?.includes('quota exceeded') || error.message?.includes('RESOURCE_EXHAUSTED');
+              
+          // Kill the process if we get a rate limit error
+          if (isRateLimitError) {
+          this.logger.error(`Fatal error from Gemini API: ${error.message}. Killing process.`);
+          process.exit(1);
+          }
           throw error;
         }
         
-        // Check for rate limit errors or server errors
-        const isRateLimitError = error.message?.includes('429') || 
-                                error.message?.includes('rate limit') ||
-                                error.message?.includes('quota exceeded') || error.message?.includes('RESOURCE_EXHAUSTED');
-                                     
-        // Kill the process if we get a rate limit error
-        if (isRateLimitError) {
-          this.logger.error(`Fatal error from Gemini API: ${error.message}. Killing process.`);
-          process.exit(1);
-        }
         
         // Use exponential backoff for other errors
         let delay = retryDelayMs;
