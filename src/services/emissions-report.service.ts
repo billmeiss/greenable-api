@@ -34,6 +34,7 @@ export class EmissionsReportService {
 
         If the company has a portfolio of other companies, you must extract the emissions data for each company in the portfolio and return those emissions under the field "portfolioCompanies".
         Do not return portfolio companies for mining resources, infrastructure, energy, or real estate companies.
+        Only return portfolio companies for companies that are investment holding, or financial companies.
         
         YOUR RESPONSE MUST BE VALID JSON. Use the following structure:
         {
