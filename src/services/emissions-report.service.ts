@@ -33,7 +33,7 @@ export class EmissionsReportService {
         Extract greenhouse gas emissions data from this sustainability/ESG report for ${company}.
 
         If the company has a portfolio of other companies, you must extract the emissions data for each company in the portfolio and return those emissions under the field "portfolioCompanies".
-        Do not return portfolio companies for mining or resources companies.
+        Do not return portfolio companies for mining resources, infrastructure, energy, or real estate companies.
         
         YOUR RESPONSE MUST BE VALID JSON. Use the following structure:
         {
