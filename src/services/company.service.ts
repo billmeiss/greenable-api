@@ -298,16 +298,21 @@ export class CompanyService {
       }
     `;
 
-    const result = await this.geminiApiService.handleGeminiCall(
-      () => this.geminiAiService.processPDF(reportUrl, prompt, 'auditedCompanies'),
-      2,
-      1000,
-      10 * 60 * 1000
+    try {
+      const result = await this.geminiApiService.handleGeminiCall(
+        () => this.geminiAiService.processPDF(reportUrl, prompt, 'auditedCompanies'),
+        2,
+        1000,
+        10 * 60 * 1000
     );
     
     const parsedResponse = this.geminiApiService.safelyParseJson(result);
 
-    return parsedResponse;
+      return parsedResponse;
+    } catch (error) {
+      console.log(`[ERROR] Failed to get company audited for ${companyData.name}: ${error.message}`);
+      return null;
+    }
   }
 
   /**
