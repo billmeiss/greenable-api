@@ -125,12 +125,13 @@ export class AppService {
         const result = await this.companyService.getCompanyAudited(company);
         if (!result) {
           console.log(`[ERROR] Failed to update audited companies for ${company.name}`);
+          continue;
+        }
+        await this.companyService.updateCompanyAudited(company.name, result.thirdPartyAssurance, result.notes);
+      } catch (error) {
+        console.log(`[ERROR] Failed to update audited companies for ${company.name}: ${error.message}`);
         continue;
       }
-      await this.companyService.updateCompanyAudited(company.name, result.thirdPartyAssurance, result.notes);
-    } catch (error) {
-      console.log(`[ERROR] Failed to update audited companies for ${company.name}: ${error.message}`);
-      continue;
     }
   }
 }
