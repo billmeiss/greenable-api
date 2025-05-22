@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GoogleGenAI, Type } from '@google/genai';
+import { DynamicRetrievalConfigMode, GoogleGenAI, Type } from '@google/genai';
 
 @Injectable()
 export class GeminiModelService {
@@ -14,7 +14,7 @@ export class GeminiModelService {
   private initializeModelConfigs(): void {
     // Generic model
     this.modelConfigs.generic = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
     };
 
     this.modelConfigs.companyNameChecker = {
@@ -29,184 +29,220 @@ export class GeminiModelService {
     };
 
     this.modelConfigs.companyCategory = {
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
-        responseMimeType: 'application/json',
+        temperature: 0.1,
       },
-      systemInstruction: `You will return responses in this JSON format:
+      systemInstruction: `You will return responses in this JSON format only :
         {
-          "companyCategory": "The category of the given company, can be one of the following:
-            Basic Copper
-            Publishing
-            Printing
-            Plastic Products
-            Civil Engineering Construction
-            Telecommunications
-            Other Services
-            Uranium Ores
-            Hard Coal
-            Raising Of Cattle
-            Non-nitrogenous And Mixed Fertilizers
-            Computers Electronic Products Optical And Precision Instruments
-            Building Construction
-            Growing Beverage Crops (coffee, Tea Etc)
-            Quarrying Of Stone, Sand And Clay
-            Growing Tobacco
-            Growing Wheat
-            Forestry And Logging
-            Materials Recovery
-            Basic Organic Chemicals
-            Water Transport
-            Basic Inorganic Chemicals
-            Copper Ores
-            Cereal Products
-            Other Non-ferrous Ores (e.g. Nickel, Tin, Lead, Zinc, Silver, Gold)
-            Hospitality
-            Dyes, Paints, Glues, Detergents And Other Chemical Products
-            Leather And Footwear
-            Transport Via Pipeline
-            Repair And Installation Of Machinery And Equipment
-            Road Transport
-            Government Social Security Defence Public Order
-            Gas Extraction
-            Motor Vehicles, Trailers And Semi-trailers
-            Growing Crops N.e.c.
-            Furniture And Other Manufacturing N.e.c
-            Basic Non-ferrous Metals N.e.c.
-            Information Services
-            Other Ceramics N.e.c. (e.g. Cement, Lime, Plaster)
-            Clay Building Materials
-            Arts, Entertainment And Recreation
-            Education
-            Growing Grapes
-            Fabricated Metal Products
-            Electric Power Generation, Transmission And Distribution
-            Motor Vehicles, Trailers And Semi-trailers
-            Fishing
-            Basic Aluminium
-            Raising Of Poultry
-            Growing Maize
-            Basic Non-ferrous Metals N.e.c.
-            Basic Copper
-            Chemical And Fertilizer Minerals
-            Rail Transport
-            Growing Sugar Beet And Cane
-            Animal Oils And Fats
-            Civil Engineering Construction
-            Growing Spices, Aromatic, Drug And Pharmaceutical Crops
-            Other Non-ferrous Ores
-            Raising Of Sheep
-            Growing Grapes
-            Distribution Of Gaseous Fuels Through Mains
-            Dairy Products
-            Sheep Meat
-            Growing Crops N.e.c.
-            Non-nitrogenous And Mixed Fertilizers
-            Lead/zinc/silver Ores
-            Fish Products
-            Mining And Quarrying N.e.c. Services To Mining
-            Basic Nickel
-            Sawmill Products
-            Waste Collection, Treatment, And Disposal
-            Nickel Ores
-            Road Transport
-            Arts, Entertainment And Recreation
-            Fruit Products
-            Information Services
-            Electrical Equipment
-            Fabricated Metal Products
-            Pharmaceuticals And Medicinal Products
-            Professional, Scientific And Technical Services
-            Copper Ores
-            Postal And Courier Services
-            Extraction Of Salt
-            Growing Fruits And Nuts
-            Quarrying Of Stone, Sand And Clay
-            Coke Oven Products
-            Growing Vegetables, Roots, Tubers
-            Basic Iron And Steel
-            Gas Extraction
-            Forestry And Logging
-            Sugar Refining Cocoa, Chocolate And Confectionery
-            Vegetable Oils And Fats
-            Vegetable Products
-            Human Health And Social Work Activities
-            Tobacco Products
-            Materials Recovery
-            Air Transport
-            Aluminium Ore
-            Pork
-            Clay Building Materials
-            Property And Real Estate
-            Rubber Products
-            Basic Organic Chemicals
-            Water Collection, Treatment And Supply Sewerage
-            Administrative Services
-            Other Services (e.g. consulting, marketing, etc)
-            Growing Fibre Crops
-            Pulp And Paper
-            Leather And Footwear
-            Transport Via Pipeline
-            Telecommunications
-            Cereal Products
-            Basic Tin
-            Other Transport Equipment (e.g. Ships, Planes, Trains)
-            Computers Electronic Products Optical And Precision Instruments
-            Repair And Installation Of Machinery And Equipment
-            Refined Petroleum Products
-            Alcoholic And Other  Beverages
-            Dyes, Paints, Glues, Detergents And Other Chemical Products
-            Raising Of Cattle
-            Finance And Insurance
-            Food Products And Feeds N.e.c.
-            Seeds And Plant Propagation
-            Growing Leguminous Crops And Oil Seeds
-            Growing Beverage Crops (coffee, Tea Etc)
-            Hard Coal
-            Other Non-metallic Mineral Products N.e.c.
-            Services To Transport
-            Textiles And Clothing
-            Other Meat Products
-            Hospitality
-            Basic Petrochemical Products
-            Basic Gold
-            Other Ceramics N.e.c.
-            Growing Rice
-            Cement, Lime And Plaster Products
-            Government Social Security Defence Public Order
-            Growing Cereals N.e.c
-            Uranium Ores
-            Furniture And Other Manufacturing N.e.c
-            Basic Inorganic Chemicals
-            Basic Lead/zinc/silver
-            Education
-            Machinery And Equipment
-            Raising Of Animals N.e.c. Services To Agriculture
-            Water Transport
-            Crustaceans And Molluscs
-            Beef Meat
-            Petroleum Extraction
-            Wholesale And Retail Trade Repair Of Motor Vehicles And Motorcycles
-            Growing Wheat
-            Publishing
-            Raising Of Swine/pigs
-            Growing Tobacco
-            Printing
-            Lignite And Peat
-            Plastic Products
-            Tin Ores
-            Poultry Meat
-            Iron Ores
-            Nitrogenous Fertilizers
-            Building Construction
-            Gold Ores
+          "companyCategory": "The category of the given company, is the most appropriate category possible from the following list:
+            Paddy rice
+Wheat
+Cereal grains nec
+Vegetables, fruit, nuts
+Oil seeds
+Sugar cane, sugar beet
+Plant-based fibers
+Crops nec
+Cattle
+Pigs
+Poultry
+Meat animals nec
+Animal products nec
+Raw milk
+Wool, silk-worm cocoons
+Manure (conventional treatment)
+Manure (biogas treatment)
+Products of forestry, logging and related services
+Fish and other fishing products; services incidental of fishing
+Anthracite
+Coking Coal
+Other Bituminous Coal
+Sub-Bituminous Coal
+Patent Fuel
+Lignite/Brown Coal
+BKB/Peat Briquettes
+Peat
+Crude petroleum and services related to crude oil extraction, excluding surveying
+Natural gas and services related to natural gas extraction, excluding surveying
+Natural Gas Liquids
+Other Hydrocarbons
+Uranium and thorium ores
+Iron ores
+Copper ores and concentrates
+Nickel ores and concentrates
+Aluminium ores and concentrates
+Precious metal ores and concentrates
+Lead, zinc and tin ores and concentrates
+Other non-ferrous metal ores and concentrates
+Stone
+Sand and clay
+Chemical and fertilizer minerals, salt and other mining and quarrying products n.e.c.
+Products of meat cattle
+Products of meat pigs
+Products of meat poultry
+Meat products nec
+products of Vegetable oils and fats
+Dairy products
+Processed rice
+Sugar
+Food products nec
+Beverages
+Fish products
+Tobacco products
+Textiles
+Wearing apparel; furs
+Leather and leather products
+Wood and products of wood and cork; articles of straw and plaiting materials
+Wood material for treatment, Re-processing of secondary wood material into new wood material
+Pulp
+Secondary paper for treatment, Re-processing of secondary paper into new pulp
+Paper and paper products
+Printed matter and recorded media
+Coke Oven Coke
+Gas Coke
+Coal Tar
+Motor Gasoline
+Aviation Gasoline
+Gasoline Type Jet Fuel
+Kerosene Type Jet Fuel
+Kerosene
+Gas/Diesel Oil
+Heavy Fuel Oil
+Refinery Gas
+Liquefied Petroleum Gases (LPG)
+Refinery Feedstocks
+Ethane
+Naphtha
+White Spirit & SBP
+Lubricants
+Bitumen
+Paraffin Waxes
+Petroleum Coke
+Non-specified Petroleum Products
+Nuclear fuel
+Plastics, basic
+Secondary plastic for treatment, Re-processing of secondary plastic into new plastic
+N-fertiliser
+P- and other fertiliser
+Chemicals nec
+Charcoal
+Additives/Blending Components
+Biogasoline
+Biodiesels
+Other Liquid Biofuels
+Rubber and plastic products
+Glass and glass products
+Secondary glass for treatment, Re-processing of secondary glass into new glass
+Ceramic goods
+Bricks, tiles and construction products, in baked clay
+Cement, lime and plaster
+Ash for treatment, Re-processing of ash into clinker
+Other non-metallic mineral products
+Basic iron and steel and of ferro-alloys and first products thereof
+Secondary steel for treatment, Re-processing of secondary steel into new steel
+Precious metals
+Secondary preciuos metals for treatment, Re-processing of secondary preciuos metals into new preciuos metals
+Aluminium and aluminium products
+Secondary aluminium for treatment, Re-processing of secondary aluminium into new aluminium
+Lead, zinc and tin and products thereof
+Secondary lead for treatment, Re-processing of secondary lead into new lead
+Copper products
+Secondary copper for treatment, Re-processing of secondary copper into new copper
+Other non-ferrous metal products
+Secondary other non-ferrous metals for treatment, Re-processing of secondary other non-ferrous metals into new other non-ferrous metals
+Foundry work services
+Fabricated metal products, except machinery and equipment
+Machinery and equipment n.e.c.
+Office machinery and computers
+Electrical machinery and apparatus n.e.c.
+Radio, television and communication equipment and apparatus
+Medical, precision and optical instruments, watches and clocks
+Motor vehicles, trailers and semi-trailers
+Other transport equipment
+Furniture; other manufactured goods n.e.c.
+Secondary raw materials
+Bottles for treatment, Recycling of bottles by direct reuse
+Electricity by coal
+Electricity by gas
+Electricity by nuclear
+Electricity by hydro
+Electricity by wind
+Electricity by petroleum and other oil derivatives
+Electricity by biomass and waste
+Electricity by solar photovoltaic
+Electricity by solar thermal
+Electricity by tide, wave, ocean
+Electricity by Geothermal
+Electricity nec
+Transmission services of electricity
+Distribution and trade services of electricity
+Coke oven gas
+Blast Furnace Gas
+Oxygen Steel Furnace Gas
+Gas Works Gas
+Biogas
+Distribution services of gaseous fuels through mains
+Steam and hot water supply services
+Collected and purified water, distribution services of water
+Construction work
+Secondary construction material for treatment, Re-processing of secondary construction material into aggregates
+Sale, maintenance, repair of motor vehicles, motor vehicles parts, motorcycles, motor cycles parts and accessoiries
+Retail trade services of motor fuel
+Wholesale trade and commission trade services, except of motor vehicles and motorcycles
+Retail trade services, except of motor vehicles and motorcycles; repair services of personal and household goods
+Hotel and restaurant services
+Railway transportation services
+Other land transportation services
+Transportation services via pipelines
+Sea and coastal water transportation services
+Inland water transportation services
+Air transport services 
+Supporting and auxiliary transport services; travel agency services
+Post and telecommunication services
+Financial intermediation services, except insurance and pension funding services
+Insurance and pension funding services, except compulsory social security services
+Services auxiliary to financial intermediation
+Real estate services
+Renting services of machinery and equipment without operator and of personal and household goods
+Computer and related services
+Research and development services
+Other business services
+Public administration and defence services; compulsory social security services 
+Education services
+Health and social work services
+Food waste for treatment: incineration
+Paper waste for treatment: incineration
+Plastic waste for treatment: incineration
+Intert/metal waste for treatment: incineration
+Textiles waste for treatment: incineration
+Wood waste for treatment: incineration
+Oil/hazardous waste for treatment: incineration
+Food waste for treatment: biogasification and land application
+Paper waste for treatment: biogasification and land application
+Sewage sludge for treatment: biogasification and land application
+Food waste for treatment: composting and land application
+Paper and wood waste for treatment: composting and land application
+Food waste for treatment: waste water treatment
+Other waste for treatment: waste water treatment
+Food waste for treatment: landfill
+Paper for treatment: landfill
+Plastic waste for treatment: landfill
+Inert/metal/hazardous waste for treatment: landfill
+Textiles waste for treatment: landfill
+Wood waste for treatment: landfill
+Membership organisation services n.e.c.
+Recreational, cultural and sporting services
+Other services
+Private households with employed persons
+Extra-territorial organizations and bodies
           "
         }`
     }
 
     // Related companies model
     this.modelConfigs.relatedCompanies = {
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -217,7 +253,7 @@ export class GeminiModelService {
     };
 
     this.modelConfigs.countryFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -231,7 +267,7 @@ export class GeminiModelService {
 
     // Parent company finder model
     this.modelConfigs.parentCompanyFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -243,7 +279,7 @@ export class GeminiModelService {
 
     // Report finder model
     this.modelConfigs.reportFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         temperature: 0.1,
       },
@@ -257,7 +293,7 @@ export class GeminiModelService {
 
     // Direct report finder model
     this.modelConfigs.directReportFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -340,9 +376,10 @@ export class GeminiModelService {
 
     // Revenue model
     this.modelConfigs.revenue = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
-        responseMimeType: 'application/json',
+        temperature: 0.1,
+        tools: [{googleSearch: {}}],
       },
       systemInstruction:  `You will research and provide accurate financial information about companies.
 

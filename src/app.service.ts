@@ -112,7 +112,7 @@ export class AppService {
   async updateCategories(): Promise<any> {
     const companies = await this.companyService.getExistingCompaniesFromSheet();
     for (const company of companies) {
-      const { name } = company;
+      const { name, category: existingCategory } = company;
       const category = await this.companyService.getCompanyCategory(name);
       await this.companyService.updateCompanyCategory(name, category);
     }
@@ -132,6 +132,21 @@ export class AppService {
         console.log(`[ERROR] Failed to update audited companies for ${company.name}: ${error.message}`);
         continue;
       }
+    }
+  }
+
+  async updateCompanyRevenues(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    for (const company of companies) {
+      const { name, reportingPeriod, revenueYear, revenueSource } = company;
+      const parsedReportingPeriod = this.companyService.extractYearFromPeriod(reportingPeriod);
+      const parsedRevenueYear = this.companyService.extractYearFromPeriod(revenueYear);
+      console.log(parsedReportingPeriod, parsedRevenueYear);
+      if (parsedReportingPeriod === parsedRevenueYear && revenueSource.includes('Financial Modeling Prep')) {
+        continue;
+      }
+      const revenue = await this.companyService.getCompanyRevenue(name, company.reportingPeriod);
+      await this.companyService.updateCompanyRevenue(name, revenue);
     }
   }
 }

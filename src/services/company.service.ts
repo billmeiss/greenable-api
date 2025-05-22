@@ -386,7 +386,7 @@ export class CompanyService {
       // First try getting revenue from Financial Modeling Prep API
       const fmpRevenueData = await this.getCompanyRevenueFromFMP(companyName, targetYear);
       console.log(targetYear, fmpRevenueData);
-      if (fmpRevenueData) {
+      if (fmpRevenueData && fmpRevenueData.year === targetYear) {
         this.logger.log(`Retrieved revenue data for ${companyName} from FMP API`);
         return fmpRevenueData;
       }
@@ -499,7 +499,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
     const result = await this.geminiApiService.handleGeminiCall(
       () => companyCategoryModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: `I need to find the category of ${companyName}.` }] }],
+        contents: [{ role: 'user', parts: [{ text: `I need to find the category of ${companyName}. Please return the most appropriate category possible in the JSON format. Do not provide any additional text.` }] }],
       })
     );
 
@@ -559,7 +559,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Use the SheetsApiService with built-in exponential backoff
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        "'Analysed Data'!A2:G"
+        "'Analysed Data'!A2:AI"
       );
       
       const rows = data.values || [];
@@ -569,7 +569,9 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         reportingPeriod: row[3], 
         revenueYear: row[4], 
         revenue: row[5], 
-        exchangeRateCountry: row[6]
+        exchangeRateCountry: row[6],
+        category: row[30],
+        revenueSource: row[33]
       })).filter(Boolean);
 
       return companies;
@@ -909,6 +911,12 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         [[revenueData.year, revenueData.revenue, revenueData.currency]]
       );
 
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!AH${companyIndex + 2}`,
+        [[revenueData.source, revenueData.sourceUrl]]
+      );
+
       console.log(`[RESULT] Successfully updated revenue for ${company} in 'Analysed Data' sheet`);
       return true;
     } catch (error) {
@@ -1012,7 +1020,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const rates = await this.getExchangeRates();
     const year = this.extractYearFromPeriod(reportingPeriod);
     if (year !== 2021 && year !== 2022 && year !== 2023 && year !== 2024) {
-      return rates['2024'][exchangeRateCountry];
+      return rates['2021'][exchangeRateCountry];
     } else {
       return rates[year][exchangeRateCountry];
     }
@@ -1072,7 +1080,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Update the cell with the new category data
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Copy of Final V1!AE${companyIndex + 2}`,
+        `Analysed Data!AE${companyIndex + 2}`,
         [[category]]
       );
 

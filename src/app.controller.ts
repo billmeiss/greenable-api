@@ -46,4 +46,9 @@ export class AppController {
   updateAuditedCompanies() {
     return this.appService.updateAuditedCompanies();
   }
+
+  @Post('/update-missing-revenues')
+  updateMissingRevenues() {
+    return this.appService.updateCompanyRevenues();
+  }
 }
