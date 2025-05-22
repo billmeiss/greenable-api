@@ -142,7 +142,7 @@ export class AppService {
       const parsedReportingPeriod = this.companyService.extractYearFromPeriod(reportingPeriod);
       const parsedRevenueYear = this.companyService.extractYearFromPeriod(revenueYear);
       console.log(parsedReportingPeriod, parsedRevenueYear);
-      if (parsedReportingPeriod === parsedRevenueYear && revenueSource.includes('Financial Modeling Prep')) {
+      if (parsedReportingPeriod === parsedRevenueYear && revenueSource?.includes('Financial Modeling Prep')) {
         continue;
       }
       const revenue = await this.companyService.getCompanyRevenue(name, company.reportingPeriod);
