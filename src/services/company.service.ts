@@ -552,14 +552,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
   }
 
-  async getExistingCompaniesFromSheet(): Promise<any[]> {
+  async getExistingCompaniesFromSheet({ fromRow }: { fromRow?: number } = {}): Promise<any[]> {
     try {
       console.log(`[STEP] Fetching data from 'Analysed Data' sheet`);
       
       // Use the SheetsApiService with built-in exponential backoff
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        "'Analysed Data'!A2:AI"
+        `'Analysed Data'!A${fromRow || 2}:AI`
       );
       
       const rows = data.values || [];
@@ -571,7 +571,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         revenue: row[5], 
         exchangeRateCountry: row[6],
         category: row[30],
-        revenueSource: row[33]
+        revenueSource: row[33],
+        notes: row[32]
       })).filter(Boolean);
 
       return companies;

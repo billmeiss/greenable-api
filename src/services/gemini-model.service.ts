@@ -37,6 +37,7 @@ export class GeminiModelService {
         {
           "companyCategory": "The category of the given company, is the most appropriate category possible from the following list:
             Paddy rice
+
 Wheat
 Cereal grains nec
 Vegetables, fruit, nuts
@@ -203,6 +204,7 @@ Post and telecommunication services
 Financial intermediation services, except insurance and pension funding services
 Insurance and pension funding services, except compulsory social security services
 Services auxiliary to financial intermediation
+Financial services nec
 Real estate services
 Renting services of machinery and equipment without operator and of personal and household goods
 Computer and related services

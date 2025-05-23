@@ -119,9 +119,13 @@ export class AppService {
   }
 
   async updateAuditedCompanies(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 4498 });
     for (const company of companies) {
+      const { name, notes } = company;
       try {
+        if (notes) {
+          continue;
+        }
         const result = await this.companyService.getCompanyAudited(company);
         if (!result) {
           console.log(`[ERROR] Failed to update audited companies for ${company.name}`);
