@@ -499,7 +499,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
     const result = await this.geminiApiService.handleGeminiCall(
       () => companyCategoryModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: `I need to find the category of ${companyName}. Please return the most appropriate category possible in the JSON format. Do not provide any additional text.` }] }],
+        contents: [{ role: 'user', parts: [{ text: `I need to find the category of ${companyName}. Please return the most appropriate category possible in the JSON format. If the comony is Other business services, return Other business services - {The type of service provided by the company}. Do not provide any additional text.` }] }],
       })
     );
 

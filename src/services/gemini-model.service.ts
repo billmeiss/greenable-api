@@ -34,6 +34,7 @@ export class GeminiModelService {
         temperature: 0.1,
       },
       systemInstruction: `You will return responses in this JSON format only :
+      If the comony is Other business services, return Other business services - {The type of service provided by the company}
         {
           "companyCategory": "The category of the given company, is the most appropriate category possible from the following list:
             Paddy rice
