@@ -322,6 +322,101 @@ Extra-territorial organizations and bodies
                       "notes": "Additional information about how scope 1, 2 and 3 emissions were calculated"`
     }
 
+    this.modelConfigs.missingScopes = {
+      model: 'gemini-2.5-pro-preview-05-06',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+      },
+      systemInstruction: `You will return responses in this JSON format:
+      {
+      "scope1": {
+                "value": number,
+                "notes": "Additional information about scope 1 emissions, including if combined with scope 2",
+                "confidence": 0
+              },
+              "scope2": {
+                "locationBased": {
+                  "value": number,
+                  "confidence": 0
+                },
+                "marketBased": {
+                  "value": number,
+                  "confidence": 0
+                },
+                "notes": "Additional information about scope 2 emissions, including if combined with scope 1"
+              },
+              "scope3": {
+                "total": {
+                  "value": number,
+                  "confidence": 0
+                },
+                "categories": {
+                  "1": {
+                    "value": number,
+                    "description": "Purchased goods and services",
+                  }
+                    "2": {
+                      "value": number,
+                      "description": "Capital goods",
+                    }
+                    "3": {
+                      "value": number,
+                      "description": "Fuel and energy related activities",
+                    }
+                    "4": {
+                      "value": number,
+                      "description": "Upstream transportation and distribution",
+                    }
+                    "5": {
+                      "value": number,
+                      "description": "Waste generated in operations",
+                    }
+                    "6": {
+                      "value": number,
+                      "description": "Business travel",
+                    }
+                    "7": {
+                      "value": number,
+                      "description": "Employee commuting",
+                    }
+                    "8": {
+                      "value": number,
+                      "description": "Upstream leased assets",
+                    }
+                    "9": {
+                      "value": number,
+                      "description": "Downstream transportation and distribution",
+                    }
+                    "10": {
+                      "value": number,
+                      "description": "Processing of sold products",
+                    }
+                    "11": {
+                      "value": number,
+                      "description": "Use of sold products",
+                    }
+                    "12": {
+                      "value": number,
+                      "description": "End of life treatment of sold products",
+                    }
+                    "13": {
+                      "value": number,
+                      "description": "Downstream leased assets",
+                    }
+                    "14": {
+                      "value": number,
+                      "description": "Franchises",
+                    }
+                    "15": {
+                      "value": number,
+                      "description": "Investments",
+                    }
+                }
+              }
+      }`
+    }
+
     // ESG model
     this.modelConfigs.esg = {
       model: 'gemini-2.5-pro-preview-05-06',
@@ -370,7 +465,104 @@ Extra-territorial organizations and bodies
                     "notes": "Additional details about this category",
                     "confidence": 0
                   }
-                  // Additional categories would continue here
+                    "2": {
+                      "value": 0,
+                      "description": "Capital goods",
+                      "included": true, 
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "3": {
+                      "value": 0,
+                      "description": "Fuel and energy related activities",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "4": {
+                      "value": 0,
+                      "description": "Upstream transportation and distribution",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "5": {
+                      "value": 0,
+                      "description": "Waste generated in operations",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "6": {
+                      "value": 0,
+                      "description": "Business travel",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "7": {
+                      "value": 0,
+                      "description": "Employee commuting",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "8": {
+                      "value": 0,
+                      "description": "Upstream leased assets",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "9": {
+                      "value": 0,
+                      "description": "Downstream transportation and distribution",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "10": {
+                      "value": 0,
+                      "description": "Processing of sold products",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "11": {
+                      "value": 0,
+                      "description": "Use of sold products",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "12": {
+                      "value": 0,
+                      "description": "End of life treatment of sold products",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "13": {
+                      "value": 0,
+                      "description": "Downstream leased assets",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "14": {
+                      "value": 0,
+                      "description": "Franchises",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
+                    "15": {
+                      "value": 0,
+                      "description": "Investments",
+                      "included": true,
+                      "notes": "Additional details about this category",
+                      "confidence": 0
+                    }
                 }
               }
             }`

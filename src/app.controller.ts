@@ -51,4 +51,9 @@ export class AppController {
   updateMissingRevenues() {
     return this.appService.updateCompanyRevenues();
   }
+
+  @Post('/check-missing-scopes')
+  checkMissingScopes() {
+    return this.appService.checkMissingScopes();
+  }
 }
