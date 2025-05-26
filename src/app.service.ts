@@ -110,7 +110,7 @@ export class AppService {
   }
 
   async updateCategories(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 1685 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 4641 });
     for (const company of companies) {
       const { name, category: existingCategory } = company;
       const category = await this.companyService.getCompanyCategory(name);
@@ -166,9 +166,13 @@ export class AppService {
       const missingAScope = !scope1 || (!scope2Location && !scope2Market) || (scope3 && !scope3Cat1 && !scope3Cat2 && !scope3Cat3 && !scope3Cat4 && !scope3Cat5 && !scope3Cat6 && !scope3Cat7 && !scope3Cat8 && !scope3Cat9 && !scope3Cat10 && !scope3Cat11 && !scope3Cat12 && !scope3Cat13 && !scope3Cat14 && !scope3Cat15);
       if (missingAScope) {
         console.log(`[ERROR] Missing scope for ${name}`);
-        const result = await this.companyService.checkReportUrlForMissingScopes(reportUrl);
-        await this.companyService.updateMissingScopes(name, result, company);
-
+        try {
+          const result = await this.companyService.checkReportUrlForMissingScopes(name, reportUrl);
+          await this.companyService.updateMissingScopes(name, result, company);
+        } catch (error) {
+          console.log(`[ERROR] Failed to update missing scopes for ${name}: ${error.message}`);
+          continue;
+        }
       }
     }
   }

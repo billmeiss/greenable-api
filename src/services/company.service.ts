@@ -602,13 +602,16 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
   }
 
-  async checkReportUrlForMissingScopes(reportUrl: any): Promise<any> {
+  async checkReportUrlForMissingScopes(companyName: string, reportUrl: any): Promise<any> {
     const missingScopesModel = this.geminiModelService.getModel('missingScopes');
 
     const prompt = `
+    For company ${companyName}
     Look for tables, charts, and text that explicitly mention greenhouse gas emissions.
         Ensure all values are converted to the same unit (preferably tons of CO2 equivalent).
         Identify the reporting period for the emissions data.
+
+        Extract greenhouse gas emissions data from this sustainability/ESG report
         
         For scope 3 emissions, carefully analyze which categories (1-15) are reported:
         1. Purchased goods and services
@@ -659,121 +662,55 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       Gather all emissions values for every category and return them in the following JSON format:
 
       You must return the response in the following JSON format:
-      {
-        "scope1Emissions": {
-          "value": number (total scope 1 emissions),
-          "included": boolean,
-        },
-        "scope2Emissions": {
-          "locationBased": {
-            "value": number (total scope 2 emissions),
+      
+      "scope1": {
+            "value": number,
             "included": boolean,
+            "unit": "string",
+            "confidence": number (0-10)
           },
-          "marketBased": {
-            "value": number (total scope 2 emissions),
-            "included": boolean,
-          }
-        },
-        "scope3Emissions": {
-          "categories": {
-            "1": {
-              "value": number (total scope 3 category 1 emissions),
-              "included": boolean,
-              "description": "Purchased goods and services",
-              "notes": "Additional information about scope 3 category 1 emissions",
-            },
-            "2": {
-              "value": number (total scope 3 category 2 emissions),
-              "included": boolean,
-              "description": "Capital goods",
-              "notes": "Additional information about scope 3 category 2 emissions",
-            },
-            "3": {
-              "value": number (total scope 3 category 3 emissions),
-              "included": boolean,
-              "description": "Fuel- and energy-related activities",
-              "notes": "Additional information about scope 3 category 3 emissions",
-            },
-            "4": {
-              "value": number (total scope 3 category 4 emissions),
-              "included": boolean,
-              "description": "Upstream transportation and distribution",
-              "notes": "Additional information about scope 3 category 4 emissions",
-            },
-            "5": {
-              "value": number (total scope 3 category 5 emissions),
-              "included": boolean,
-              "description": "Waste generated in operations",
-              "notes": "Additional information about scope 3 category 5 emissions",
-            },
-            "6": {
-              "value": number (total scope 3 category 6 emissions),
-              "included": boolean,
-              "description": "Business travel",
-              "notes": "Additional information about scope 3 category 6 emissions",
-            },
-            "7": {
-              "value": number (total scope 3 category 7 emissions),
-              "included": boolean,
-              "description": "Employee commuting",
-              "notes": "Additional information about scope 3 category 7 emissions",
-            },
-            "8": {
+          "scope2": {
+            "locationBased": {
               "value": number,
-              "included": boolean,
-              "description": "Upstream leased assets",
-              "notes": "Additional information about scope 3 category 8 emissions",
+              "unit": "string",
+              "confidence": number (0-10),
+              "included": boolean
             },
-            "9": {
+            "marketBased": {
               "value": number,
-              "included": boolean,
-              "description": "Downstream transportation and distribution",
-              "notes": "Additional information about scope 3 category 9 emissions",
-            },
-            "10": {
-              "value": number,
-              "included": boolean,
-              "description": "Processing of sold products",
-              "notes": "Additional information about scope 3 category 10 emissions",
-            },
-            "11": {
-              "value": number,
-              "included": boolean,
-              "description": "Use of sold products",
-              "notes": "Additional information about scope 3 category 11 emissions",
-            },
-            "12": {
-              "value": number,
-              "included": boolean,
-              "description": "End-of-life treatment of sold products",
-              "notes": "Additional information about scope 3 category 12 emissions",
-            },
-            "13": {
-              "value": number,
-              "included": boolean,
-              "description": "Downstream leased assets",
-              "notes": "Additional information about scope 3 category 13 emissions",
-            },
-            "14": {
-              "value": number,
-              "included": boolean,
-              "description": "Franchises",
-              "notes": "Additional information about scope 3 category 14 emissions",
-            },
-            "15": {
-              "value": number,
-              "included": boolean,
-              "description": "Investments",
-              "notes": "Additional information about scope 3 category 15 emissions",
+              "unit": "string",
+              "confidence": number (0-10),
+              "included": boolean
             }
-          }
-        }
-      }
+          },
+          "scope3": {
+            "total": {
+              "value": number,
+              "unit": "string",
+              "confidence": number (0-10)
+            },
+            "categories": {
+              "1": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "2": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "3": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "4": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "5": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "6": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "7": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "8": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "9": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "10": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "11": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "12": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "13": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "14": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
+                  "15": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },            }
+          },
       
     `;
 
     const result = await this.geminiApiService.handleGeminiCall(
-      () => this.geminiAiService.processPDF(reportUrl, prompt, 'missingScopes')
+      () => this.geminiAiService.processPDF(reportUrl, prompt, 'missingScopes'), 2, 5000, 60 * 1000 * 3
     );
 
     console.log(result);
@@ -782,7 +719,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       throw new Error('Failed to generate content from Gemini');
     }
 
-    const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+    const parsedResponse = this.geminiApiService.safelyParseJson(result);
 
     console.log(parsedResponse);
 
@@ -807,24 +744,24 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     if (missingScopes.scope1.included && !existingScopes.scope1) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!J${companyIndex + 1}`,
-        [missingScopes.scope1 ?? 'Included in Calculation']
+        `Analysed Data!J${companyIndex + 2}`,
+        [[missingScopes.scope1.value ?? 'Not specified but included in calculation']]
       );
     }
 
-    if (missingScopes.scope2.locationBased.included && !existingScopes.scope2Location) {
+    if (missingScopes.scope2.locationBased.included && !existingScopes.scope2Location && !existingScopes.scope2Market) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!K${companyIndex + 1}`,
-        [missingScopes.scope2.locationBased ?? 'Included in Calculation']
+        `Analysed Data!K${companyIndex + 2}`,
+        [[missingScopes.scope2.locationBased.value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope2.marketBased.included && !existingScopes.scope2Market) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!L${companyIndex + 1}`,
-        [missingScopes.scope2.marketBased ?? 'Included in Calculation']
+        `Analysed Data!L${companyIndex + 2}`,
+        [[missingScopes.scope2.marketBased.value  ?? 'Not specified but included in calculation']]
       );
     }
 
@@ -832,120 +769,120 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       console.log('missingScopes.scope3.categories["1"].value', missingScopes.scope3.categories["1"].value);
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!N${companyIndex + 1}`,
-        [missingScopes.scope3.categories["1"].value ?? 'Included in Calculation']
+        `Analysed Data!N${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["1"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["2"].included && !existingScopes.scope3Cat2) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!O${companyIndex + 1}`,
-        [missingScopes.scope3.categories["2"].value ?? 'Included in Calculation']
+        `Analysed Data!O${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["2"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["3"].included && !existingScopes.scope3Cat3) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!P${companyIndex + 1}`,
-        [missingScopes.scope3.categories["3"].value ?? 'Included in Calculation']
+        `Analysed Data!P${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["3"].value ?? 'Not specified but included in calculation']]
       );
     }
     
     if (missingScopes.scope3.categories["4"].included && !existingScopes.scope3Cat4) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!Q${companyIndex + 1}`,
-        [missingScopes.scope3.categories["4"].value ?? 'Included in Calculation']
+        `Analysed Data!Q${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["4"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["5"].included && !existingScopes.scope3Cat5) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!R${companyIndex + 1}`,
-        [missingScopes.scope3.categories["5"].value ?? 'Included in Calculation']
+        `Analysed Data!R${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["5"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["6"].included && !existingScopes.scope3Cat6) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!S${companyIndex + 1}`,
-        [missingScopes.scope3.categories["6"].value ?? 'Included in Calculation']
+        `Analysed Data!S${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["6"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["7"].included && !existingScopes.scope3Cat7) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!T${companyIndex + 1}`,
-        [missingScopes.scope3.categories["7"].value ?? 'Included in Calculation']
+        `Analysed Data!T${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["7"].value ?? 'Not specified but included in calculation']]
       );
     } 
 
     if (missingScopes.scope3.categories["8"].included && !existingScopes.scope3Cat8) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!U${companyIndex + 1}`,
-        [missingScopes.scope3.categories["8"].value ?? 'Included in Calculation']
+        `Analysed Data!U${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["8"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["9"].included && !existingScopes.scope3Cat9) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!V${companyIndex + 1}`,
-        [missingScopes.scope3.categories["9"].value ?? 'Included in Calculation']
+        `Analysed Data!V${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["9"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["10"].included && !existingScopes.scope3Cat10) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!W${companyIndex + 1}`,
-        [missingScopes.scope3.categories["10"].value ?? 'Included in Calculation']
+        `Analysed Data!W${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["10"].value ?? 'Not specified but included in calculation']]
       );
       }
 
     if (missingScopes.scope3.categories["11"].included && !existingScopes.scope3Cat11) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!X${companyIndex + 1}`,
-        [missingScopes.scope3.categories["11"].value ?? 'Included in Calculation']
+        `Analysed Data!X${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["11"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["12"].included && !existingScopes.scope3Cat12) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!Y${companyIndex + 1}`,
-        [missingScopes.scope3.categories["12"].value ?? 'Included in Calculation']
+        `Analysed Data!Y${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["12"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["13"].included && !existingScopes.scope3Cat13) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!Z${companyIndex + 1}`,
-        [missingScopes.scope3.categories["13"].value ?? 'Included in Calculation']
+        `Analysed Data!Z${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["13"].value ?? 'Not specified but included in calculation']]
       );
     }
     
     if (missingScopes.scope3.categories["14"].included && !existingScopes.scope3Cat14) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AA${companyIndex + 1}`,
-        [missingScopes.scope3.categories["14"].value ?? 'Included in Calculation']
+        `Analysed Data!AA${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["14"].value ?? 'Not specified but included in calculation']]
       );
     }
 
     if (missingScopes.scope3.categories["15"].included && !existingScopes.scope3Cat15) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AB${companyIndex + 1}`,
-        [missingScopes.scope3.categories["15"].value ?? 'Included in Calculation']
+        `Analysed Data!AB${companyIndex + 2}`,
+        [[missingScopes.scope3.categories["15"].value ?? 'Not specified but included in calculation']]
       );
     }
 
