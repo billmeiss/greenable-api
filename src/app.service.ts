@@ -71,7 +71,7 @@ export class AppService {
         continue;
       }
       // Update the revenue with the exchange rate
-      const updatedRevenue = revenue * exchangeRate;
+      const updatedRevenue = revenue / exchangeRate;
       // Update the company with the new revenue
       await this.companyService.updateCompanyRevenue(name, {
         revenue: updatedRevenue,

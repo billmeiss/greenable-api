@@ -1201,7 +1201,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Update the cell with the new revenue data and year
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!E${companyIndex + 2}`,
+        `Analysed Data!F${companyIndex + 2}`,
         [[revenueData.revenue, revenueData.currency]]
       );
 
