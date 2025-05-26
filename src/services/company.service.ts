@@ -1045,7 +1045,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       
       // Prepare scope 1 emissions
       const scope1 = emissions.scope1 || {};
-      const scope1Value = scope1.value || null;
+      const scope1Value = scope1.value || scope1.included ? 'Not specified but included in calculation' : null;
       const scope1Confidence = scope1.confidence || null;
       const scope1Notes = scope1.notes || '';
       const scope1Unit = scope1.unit || emissionsUnit;
@@ -1055,8 +1055,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const scope2 = emissions.scope2 || {};
       const scope2LocationBased = scope2.locationBased || {};
       const scope2MarketBased = scope2.marketBased || {};
-      const scope2LocationValue = scope2LocationBased.value || null;
-      const scope2MarketValue = scope2MarketBased.value || null;
+      const scope2LocationValue = scope2LocationBased.value || scope2LocationBased.included && !scope2MarketBased.included ? 'Not specified but included in calculation' : null;
+      const scope2MarketValue = scope2MarketBased.value || scope2MarketBased.included ? 'Not specified but included in calculation' : null;
       const scope2Notes = scope2.notes || '';
       const scope2LocationUnit = scope2LocationBased.unit || emissionsUnit;
       const scope2MarketUnit = scope2MarketBased.unit || emissionsUnit;
@@ -1081,7 +1081,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Map each category (1-15) to its value, inclusion status, and notes
       for (let i = 1; i <= 15; i++) {
         const category = scope3Categories[i.toString()];
-        categoryValues[`category${i}`] = category?.value || null;
+        categoryValues[`category${i}`] = category?.value || category?.included ? 'Not specified but included in calculation' : null;
         categoryIncluded[`category${i}Included`] = category?.included || false;
         categoryNotes[`category${i}Notes`] = category?.notes || '';
         categoryUnits[`category${i}Unit`] = category?.unit || emissionsUnit;
@@ -1109,8 +1109,10 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
       if (revenueCurrency !== 'USD') {
         const exchangeRate = await this.getExchangeRate(reportingPeriod, revenueCurrency);
-        revenue = revenue / exchangeRate;
-        revenueCurrency = 'USD';
+        if (exchangeRate) {
+          revenue = revenue / exchangeRate;
+          revenueCurrency = 'USD';
+        }
       }
 
       console.log(`[DETAIL] Revenue: ${revenue || 'Not available'} ${revenueCurrency}, Year: ${revenueYear || 'N/A'}`);
@@ -1125,21 +1127,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Calculate overall confidence level
       const overallConfidence = this.calculateOverallConfidence(emissions, revenueData, countryData);
       console.log(`[DETAIL] Overall confidence level: ${overallConfidence}`);
-      
-      // Calculate intensity metrics if revenue is available
-      console.log(`[STEP] Calculating emissions intensity metrics for ${company}`);
-      const scope1Intensity = revenue && scope1Value ? scope1Value / revenue : null;
-      const scope2LocationIntensity = revenue && scope2LocationValue ? scope2LocationValue / revenue : null;
-      const scope2MarketIntensity = revenue && scope2MarketValue ? scope2MarketValue / revenue : null;
-      const scope3Intensity = revenue && scope3Value ? scope3Value / revenue : null;
-      
-      if (revenue) {
-        console.log(`[DETAIL] Emissions intensity metrics:`);
-        if (scope1Intensity) console.log(`[DETAIL] Scope 1 intensity: ${scope1Intensity} ${emissionsUnit}/${revenueCurrency}`);
-        if (scope2LocationIntensity) console.log(`[DETAIL] Scope 2 (Location) intensity: ${scope2LocationIntensity} ${emissionsUnit}/${revenueCurrency}`);
-        if (scope2MarketIntensity) console.log(`[DETAIL] Scope 2 (Market) intensity: ${scope2MarketIntensity} ${emissionsUnit}/${revenueCurrency}`);
-        if (scope3Intensity) console.log(`[DETAIL] Scope 3 intensity: ${scope3Intensity} ${emissionsUnit}/${revenueCurrency}`);
-      }
       
       // Format the row data
       console.log(`[STEP] Preparing spreadsheet data for ${company}`);
@@ -1215,13 +1202,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
         `Analysed Data!E${companyIndex + 2}`,
-        [[revenueData.year, revenueData.revenue, revenueData.currency]]
-      );
-
-      await this.sheetsApiService.updateValues(
-        this.SPREADSHEET_ID,
-        `Analysed Data!AH${companyIndex + 2}`,
-        [[revenueData.source, revenueData.sourceUrl]]
+        [[revenueData.revenue, revenueData.currency]]
       );
 
       console.log(`[RESULT] Successfully updated revenue for ${company} in 'Analysed Data' sheet`);
@@ -1323,11 +1304,11 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     return JSON.parse(rates);
   }
 
-  async getExchangeRate(reportingPeriod: string, exchangeRateCountry: string): Promise<number> {
+  async getExchangeRate(reportingPeriod: string, exchangeRateCountry: string): Promise<number | null> {
     const rates = await this.getExchangeRates();
     const year = this.extractYearFromPeriod(reportingPeriod);
     if (year !== 2021 && year !== 2022 && year !== 2023 && year !== 2024) {
-      return rates['2021'][exchangeRateCountry];
+      return null;
     } else {
       return rates[year][exchangeRateCountry];
     }

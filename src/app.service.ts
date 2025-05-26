@@ -66,7 +66,10 @@ export class AppService {
       }
       // Look up the exchange rate for the reporting period in rates.json
       const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
-      console.log(exchangeRate)
+      if (!exchangeRate) {
+        console.log(`[ERROR] No exchange rate found for ${name} in ${reportingPeriod}`);
+        continue;
+      }
       // Update the revenue with the exchange rate
       const updatedRevenue = revenue * exchangeRate;
       // Update the company with the new revenue
