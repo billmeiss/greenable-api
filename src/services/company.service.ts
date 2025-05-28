@@ -1045,7 +1045,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       
       // Prepare scope 1 emissions
       const scope1 = emissions.scope1 || {};
-      const scope1Value = scope1.value || scope1.included ? 'Not specified but included in calculation' : null;
+      const scope1Value = scope1.value || (scope1.included ? 'Not specified but included in calculation' : null);
       const scope1Confidence = scope1.confidence || null;
       const scope1Notes = scope1.notes || '';
       const scope1Unit = scope1.unit || emissionsUnit;
@@ -1055,8 +1055,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const scope2 = emissions.scope2 || {};
       const scope2LocationBased = scope2.locationBased || {};
       const scope2MarketBased = scope2.marketBased || {};
-      const scope2LocationValue = scope2LocationBased.value || scope2LocationBased.included && !scope2MarketBased.included ? 'Not specified but included in calculation' : null;
-      const scope2MarketValue = scope2MarketBased.value || scope2MarketBased.included ? 'Not specified but included in calculation' : null;
+      const scope2LocationValue = scope2LocationBased.value || (scope2LocationBased.included && !scope2MarketBased.included ? 'Not specified but included in calculation' : null);
+      const scope2MarketValue = scope2MarketBased.value || (scope2MarketBased.included ? 'Not specified but included in calculation' : null);
       const scope2Notes = scope2.notes || '';
       const scope2LocationUnit = scope2LocationBased.unit || emissionsUnit;
       const scope2MarketUnit = scope2MarketBased.unit || emissionsUnit;
@@ -1081,7 +1081,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Map each category (1-15) to its value, inclusion status, and notes
       for (let i = 1; i <= 15; i++) {
         const category = scope3Categories[i.toString()];
-        categoryValues[`category${i}`] = category?.value || category?.included ? 'Not specified but included in calculation' : null;
+        categoryValues[`category${i}`] = category?.value || (category?.included ? 'Not specified but included in calculation' : null);
         categoryIncluded[`category${i}Included`] = category?.included || false;
         categoryNotes[`category${i}Notes`] = category?.notes || '';
         categoryUnits[`category${i}Unit`] = category?.unit || emissionsUnit;

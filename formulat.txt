@@ -1,0 +1,166 @@
+=IF(OR(
+    REGEXMATCH(AE849, "Cement"),
+    REGEXMATCH(AE849, "Clinker"),
+    REGEXMATCH(AE849, "Concrete")
+  ), 
+  IF(AND(NOT(ISBLANK(J849)), NOT(ISBLANK(N849))), "YES - Cement", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Paddy rice"),
+    REGEXMATCH(AE849, "Wheat"),
+    REGEXMATCH(AE849, "Cereal grains"),
+    REGEXMATCH(AE849, "Vegetables, fruit, nuts"),
+    REGEXMATCH(AE849, "Oil seeds"),
+    REGEXMATCH(AE849, "Sugar cane, sugar beet"),
+    REGEXMATCH(AE849, "Plant-based fibers"),
+    REGEXMATCH(AE849, "Crops"),
+    REGEXMATCH(AE849, "Cattle"),
+    REGEXMATCH(AE849, "Pigs"),
+    REGEXMATCH(AE849, "Poultry"),
+    REGEXMATCH(AE849, "Meat animals"),
+    REGEXMATCH(AE849, "Animal products"),
+    REGEXMATCH(AE849, "Raw milk"),
+    REGEXMATCH(AE849, "Wool, silk-worm cocoons"),
+    REGEXMATCH(AE849, "Manure"),
+    REGEXMATCH(AE849, "Products of meat"),
+    REGEXMATCH(AE849, "Vegetable oils"),
+    REGEXMATCH(AE849, "Dairy products"),
+    REGEXMATCH(AE849, "Processed rice"),
+    REGEXMATCH(AE849, "N-fertiliser"),
+    REGEXMATCH(AE849, "P- and other fertiliser")
+  ), 
+  IF(AND(NOT(ISBLANK(N849)), NOT(ISBLANK(J849)), NOT(ISBLANK(X849)), NOT(ISBLANK(W849))), "YES - Agriculture", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Capital Goods"),
+    REGEXMATCH(AE849, "Machinery and equipment"),
+    REGEXMATCH(AE849, "Furniture"),
+    REGEXMATCH(AE849, "Office machinery")
+  ), 
+  IF(AND(NOT(ISBLANK(X849)), NOT(ISBLANK(N849))), "YES - Capital Goods", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Chemicals"),
+    REGEXMATCH(AE849, "Plastics, basic"),
+    REGEXMATCH(AE849, "Chemical and fertilizer minerals"),
+    REGEXMATCH(AE849, "Rubber and plastic products"),
+    REGEXMATCH(AE849, "N-fertiliser"),
+    REGEXMATCH(AE849, "P- and other fertiliser")
+  ),
+  IF(AND(NOT(ISBLANK(J849)), OR(NOT(ISBLANK(K849)), NOT(ISBLANK(L849))), NOT(ISBLANK(N849)), NOT(ISBLANK(X849)), NOT(ISBLANK(Y849)), NOT(ISBLANK(Q849)), NOT(ISBLANK(P849)), NOT(ISBLANK(O849)), NOT(ISBLANK(V849))), "YES - Chemicals", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Coking Coal"),
+    REGEXMATCH(AE849, "Other Bituminous Coal"),
+    REGEXMATCH(AE849, "Sub-Bituminous Coal"),
+    REGEXMATCH(AE849, "Lignite/Brown Coal"),
+    REGEXMATCH(AE849, "Anthracite"),
+    REGEXMATCH(AE849, "Patent Fuel"),
+    REGEXMATCH(AE849, "BKB/Peat Briquettes"),
+    REGEXMATCH(AE849, "Peat"),
+    REGEXMATCH(AE849, "Coal Tar"),
+    REGEXMATCH(AE849, "Coke Oven Coke"),
+    REGEXMATCH(AE849, "Gas Coke"),
+    REGEXMATCH(AE849, "Blast Furnace Gas"),
+    REGEXMATCH(AE849, "Coke oven gas")
+  ), IF(AND(NOT(ISBLANK(J849)), NOT(ISBLANK(N849))), "YES - Coal", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Construction work"),
+    REGEXMATCH(AE849, "Bricks, tiles and construction products"),
+    REGEXMATCH(AE849, "Secondary construction material")
+  ), IF(AND(NOT(ISBLANK(X849)), NOT(ISBLANK(N849)), NOT(ISBLANK(Q849)), NOT(ISBLANK(J849))), "YES - Construction", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Electricity by coal"),
+    REGEXMATCH(AE849, "Electricity by gas"),
+    REGEXMATCH(AE849, "Electricity by nuclear"),
+    REGEXMATCH(AE849, "Electricity by hydro"),
+    REGEXMATCH(AE849, "Electricity by wind"),
+    REGEXMATCH(AE849, "Electricity by petroleum"),
+    REGEXMATCH(AE849, "Electricity by biomass"),
+    REGEXMATCH(AE849, "Electricity by solar"),
+    REGEXMATCH(AE849, "Electricity by tide"),
+    REGEXMATCH(AE849, "Electricity by Geothermal"),
+    REGEXMATCH(AE849, "Transmission services of electricity"),
+    REGEXMATCH(AE849, "Distribution and trade services of electricity")
+  ), IF(AND(NOT(ISBLANK(J849)), NOT(ISBLANK(X849)), NOT(ISBLANK(P849))), "YES - Electric Utilities", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Financial intermediation services"),
+    REGEXMATCH(AE849, "Insurance and pension funding services"),
+    REGEXMATCH(AE849, "Services auxiliary to financial intermediation")
+  ), IF(NOT(ISBLANK(AB849)), "YES - Financial Services", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Food products"),
+    REGEXMATCH(AE849, "Beverages"),
+    REGEXMATCH(AE849, "Tobacco products"),
+    REGEXMATCH(AE849, "Sugar"),
+    REGEXMATCH(AE849, "Processed rice"),
+    REGEXMATCH(AE849, "Dairy products"),
+    REGEXMATCH(AE849, "Meat products"),
+    REGEXMATCH(AE849, "Fish products"),
+    REGEXMATCH(AE849, "Vegetable oils and fats")
+  ), IF(AND(NOT(ISBLANK(N849)), NOT(ISBLANK(J849)), OR(NOT(ISBLANK(K849)), NOT(ISBLANK(L849))), NOT(ISBLANK(U849)), NOT(ISBLANK(Q849))), "YES - Food & Beverage", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Iron ores"),
+    REGEXMATCH(AE849, "Copper ores"),
+    REGEXMATCH(AE849, "Nickel ores"),
+    REGEXMATCH(AE849, "Aluminium ores"),
+    REGEXMATCH(AE849, "Precious metal ores"),
+    REGEXMATCH(AE849, "Lead, zinc and tin ores"),
+    REGEXMATCH(AE849, "Other non-ferrous metal ores"),
+    REGEXMATCH(AE849, "Stone"),
+    REGEXMATCH(AE849, "Sand and clay")
+  ), IF(AND(NOT(ISBLANK(J849)), NOT(ISBLANK(W849))), "YES - Mining", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Basic iron and steel"),
+    REGEXMATCH(AE849, "Precious metals"),
+    REGEXMATCH(AE849, "Aluminium and aluminium products"),
+    REGEXMATCH(AE849, "Lead, zinc and tin and products"),
+    REGEXMATCH(AE849, "Copper products"),
+    REGEXMATCH(AE849, "Other non-ferrous metal products"),
+    REGEXMATCH(AE849, "Foundry work services")
+  ), IF(AND(NOT(ISBLANK(J849)), NOT(ISBLANK(N849))), "YES - Metals Processing", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Crude petroleum"),
+    REGEXMATCH(AE849, "Natural gas"),
+    REGEXMATCH(AE849, "Natural Gas Liquids"),
+    REGEXMATCH(AE849, "Other Hydrocarbons"),
+    REGEXMATCH(AE849, "Motor Gasoline"),
+    REGEXMATCH(AE849, "Aviation Gasoline"),
+    REGEXMATCH(AE849, "Gasoline Type Jet Fuel"),
+    REGEXMATCH(AE849, "Kerosene Type Jet Fuel"),
+    REGEXMATCH(AE849, "Kerosene"),
+    REGEXMATCH(AE849, "Gas/Diesel Oil"),
+    REGEXMATCH(AE849, "Heavy Fuel Oil"),
+    REGEXMATCH(AE849, "Refinery Gas"),
+    REGEXMATCH(AE849, "Liquefied Petroleum Gases"),
+    REGEXMATCH(AE849, "Refinery Feedstocks"),
+    REGEXMATCH(AE849, "Ethane"),
+    REGEXMATCH(AE849, "Naphtha")
+  ), IF(AND(NOT(ISBLANK(X849)), NOT(ISBLANK(J849)), NOT(ISBLANK(N849))), "YES - Oil and Gas", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Products of forestry"),
+    REGEXMATCH(AE849, "Wood and products of wood"),
+    REGEXMATCH(AE849, "Wood material for treatment")
+  ), IF(AND(NOT(ISBLANK(J849)), OR(NOT(ISBLANK(K849)), NOT(ISBLANK(L849))), NOT(ISBLANK(N849)), NOT(ISBLANK(W849)), NOT(ISBLANK(Y849)), NOT(ISBLANK(V849))), "YES - Forestry", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Pulp"),
+    REGEXMATCH(AE849, "Paper and paper products"),
+    REGEXMATCH(AE849, "Secondary paper for treatment"),
+    REGEXMATCH(AE849, "Printed matter and recorded media")
+  ), IF(AND(NOT(ISBLANK(N849)), NOT(ISBLANK(V849)), NOT(ISBLANK(Q849))), "YES - Paper", "NO"),
+  IF(REGEXMATCH(AE849, "Real estate services"), 
+    IF(AND(NOT(ISBLANK(O849)), NOT(ISBLANK(Z849)), NOT(ISBLANK(N849)), OR(NOT(ISBLANK(K849)), NOT(ISBLANK(L849)))), "YES - Real Estate", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Basic iron and steel"),
+    REGEXMATCH(AE849, "Secondary steel for treatment")
+  ), IF(AND(NOT(ISBLANK(J849)), OR(NOT(ISBLANK(K849)), NOT(ISBLANK(L849))), NOT(ISBLANK(N849)), NOT(ISBLANK(W849))), "YES - Steel", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Motor vehicles, trailers"),
+    REGEXMATCH(AE849, "Other transport equipment")
+  ), IF(AND(NOT(ISBLANK(X849)), NOT(ISBLANK(N849))), "YES - Transport Manufacturers", "NO"),
+  IF(OR(
+    REGEXMATCH(AE849, "Railway transportation services"),
+    REGEXMATCH(AE849, "Other land transportation services"),
+    REGEXMATCH(AE849, "Transportation services via pipelines"),
+    REGEXMATCH(AE849, "Sea and coastal water transportation services"),
+    REGEXMATCH(AE849, "Inland water transportation services"),
+    REGEXMATCH(AE849, "Air transport services"),
+    REGEXMATCH(AE849, "Supporting and auxiliary transport services")
+  ), IF(AND(NOT(ISBLANK(J849)), NOT(ISBLANK(Q849)), NOT(ISBLANK(P849))), "YES - Transport Services", "NO"),
+  IF()))))))))))))))))))
