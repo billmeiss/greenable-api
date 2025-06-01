@@ -7,7 +7,6 @@ export class AppController {
 
   @Get()
   getCompanyESGReports() {
-    console.log(process.env.GEMINI_API_KEY);
     return this.appService.processCompanyReports({ withChunking: true });
   }
 
