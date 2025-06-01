@@ -146,7 +146,7 @@ export class EmissionsReportService {
           }
         }
         
-        If no emissions data is found, return:
+        If no emissions data with absolute values are found, return:
         {
           "containsRelevantData": false
         }
