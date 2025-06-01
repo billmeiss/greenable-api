@@ -385,7 +385,7 @@ export class ReportFinderService {
         return reportUrls[0]; // Fall back to first URL
       }
       
-      const bestReportUrl = parsedResponse.reportUrl;
+      const bestReportUrl = parsedResponse.bestReportUrl;
       console.log(`[RESULT] Best report URL for ${company}: ${bestReportUrl}`);
       console.log(`[DETAIL] Confidence: ${parsedResponse.confidence}/10`);
       console.log(`[DETAIL] Reasoning: ${parsedResponse.reasoning}`);
