@@ -389,18 +389,18 @@ export class ReportFinderService {
       console.log(`[RESULT] Best report URL for ${company}: ${bestReportUrl}`);
       console.log(`[DETAIL] Confidence: ${parsedResponse.confidence}/10`);
       console.log(`[DETAIL] Reasoning: ${parsedResponse.reasoning}`);
-      
-      // Verify URL exists in our original list
-      if (!reportUrls.includes(bestReportUrl)) {
-        console.log(`[WARNING] Selected URL not in original list for ${company}, using first URL as fallback`);
-        return reportUrls[0];
-      }
 
       const doesCompanyExist = await this.companyService.doesCompanyExist(parsedResponse.companyName);
 
       if (doesCompanyExist) {
         const newReportUrls = reportUrls.filter(url => url !== bestReportUrl);
         return await this.verifyCorrectReport(newReportUrls, company);
+      }
+      
+      // Verify URL exists in our original list
+      if (!reportUrls.includes(bestReportUrl)) {
+        console.log(`[WARNING] Selected URL not in original list for ${company}, using first URL as fallback`);
+        return reportUrls[0];
       }
       
       return bestReportUrl;
