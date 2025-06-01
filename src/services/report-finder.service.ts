@@ -238,6 +238,8 @@ export class ReportFinderService {
       if (triedUrls.has(url)) {
         continue;
       }
+
+      if (!url) continue;
       
       triedUrls.add(url);
       attemptCount++;
@@ -370,14 +372,12 @@ export class ReportFinderService {
       
       if (!result || !result) {
         console.log(`[ERROR] Failed to get response from Gemini for ${company} report verification`);
-        return reportUrls[0]; // Fall back to first URL
+        return null;
       }
       
       // Parse the response
       const responseText = result.text;
       const parsedResponse = this.geminiApiService.safelyParseJson(responseText);
-
-      console.log(parsedResponse)
       
       if (!parsedResponse) {
         console.log(`[WARNING] Failed to parse Gemini response for ${company} report verification, using first URL as fallback`);
@@ -389,6 +389,11 @@ export class ReportFinderService {
       console.log(`[RESULT] Best report URL for ${company}: ${bestReportUrl}`);
       console.log(`[DETAIL] Confidence: ${parsedResponse.confidence}/10`);
       console.log(`[DETAIL] Reasoning: ${parsedResponse.reasoning}`);
+
+      if (!bestReportUrl) {
+        console.log(`[WARNING] No best report URL found for ${company}, using first URL as fallback`);
+        return null;
+      }
 
       const doesCompanyExist = await this.companyService.doesCompanyExist(parsedResponse.companyName);
 
