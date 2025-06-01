@@ -308,7 +308,7 @@ export class EmissionsReportService {
       console.log(`[DETAIL] Extracted report year: ${reportYear || 'Unknown'}`);
 
       // Add third party assurance to portfolio companies
-      if (emissions.portfolioCompanies) {
+      if (emissions.portfolioCompanies?.length > 0) {
         emissions.portfolioCompanies.forEach(company => {
           company.thirdPartyAssurance = emissions.thirdPartyAssurance;
         });
