@@ -353,6 +353,7 @@ export class ReportFinderService {
         
         Return your response in JSON format with these fields:
         - bestReportUrl: the URL of the most appropriate report
+        - companyName: the name of the company that the report belongs to
         - confidence: a score from 0-10 indicating your confidence in this selection
         - reasoning: brief explanation of why you selected this report
         - year: the likely year of the report (if detectable from the URL)
@@ -393,6 +394,13 @@ export class ReportFinderService {
       if (!reportUrls.includes(bestReportUrl)) {
         console.log(`[WARNING] Selected URL not in original list for ${company}, using first URL as fallback`);
         return reportUrls[0];
+      }
+
+      const doesCompanyExist = await this.companyService.doesCompanyExist(parsedResponse.companyName);
+
+      if (doesCompanyExist) {
+        const newReportUrls = reportUrls.filter(url => url !== bestReportUrl);
+        return await this.verifyCorrectReport(newReportUrls, company);
       }
       
       return bestReportUrl;

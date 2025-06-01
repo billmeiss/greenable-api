@@ -288,7 +288,8 @@ Extra-territorial organizations and bodies
       },
       systemInstruction: `You will return responses in this JSON format:
             {
-              "reportUrl": "The URL of the ESG report"
+              "bestReportUrl": "The URL of the ESG report",
+              "companyName": "The name of the company that the report belongs to"
             }
             
             The reportUrl field is required and must be a string.`
