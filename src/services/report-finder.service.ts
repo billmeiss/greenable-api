@@ -308,28 +308,13 @@ export class ReportFinderService {
     return null;
   }
 
-  /**
-   * Verify which report URL is the correct emissions/sustainability report for a company
-   * @param reportUrls Array of potential report URLs
-   * @param company Company name
-   * @returns The most appropriate report URL or null if none found
-   */
-  async verifyCorrectReport(reportUrls: string[], company: string): Promise<string | null> {
-    if (!reportUrls || reportUrls.length === 0) {
-      console.log(`[WARNING] No report URLs provided for ${company}`);
-      return null;
-    }
-
+  async verifyCorrectReportWithGemini(reportUrls: string[], company: string): Promise<any> {
     const existingCompanies = await this.companyService.getExistingCompaniesFromSheet();
     const attempts = await this.companyService.getAttemptsFromSheet();
 
     const companiesToExclude = [...existingCompanies.map(company => company.name), ...attempts];
-    
-    console.log(`[STEP] Verifying correct report for ${company} from ${reportUrls.length} candidates`);
-    
-    try {
-      // Get the report finder model
-      const reportFinderModel = this.geminiModelService.getModel('reportFinder');
+ 
+    const reportFinderModel = this.geminiModelService.getModel('reportFinder');
       
       // Prepare a detailed prompt for the AI
       const prompt = `
@@ -355,6 +340,7 @@ export class ReportFinderService {
         
         Return your response in JSON format with these fields:
         - bestReportUrl: the URL of the most appropriate report
+        - firstReportCompany: the name of the company that the first url belongs to
         - companyName: the name of the company that the report belongs to
         - confidence: a score from 0-10 indicating your confidence in this selection
         - reasoning: brief explanation of why you selected this report
@@ -378,11 +364,35 @@ export class ReportFinderService {
       // Parse the response
       const responseText = result.text;
       const parsedResponse = this.geminiApiService.safelyParseJson(responseText);
+
+      return parsedResponse;
+  }
+
+  /**
+   * Verify which report URL is the correct emissions/sustainability report for a company
+   * @param reportUrls Array of potential report URLs
+   * @param company Company name
+   * @returns The most appropriate report URL or null if none found
+   */
+  async verifyCorrectReport(reportUrls: string[], company: string): Promise<string | null> {
+    if (!reportUrls || reportUrls.length === 0) {
+      console.log(`[WARNING] No report URLs provided for ${company}`);
+      return null;
+    }
+    
+    console.log(`[STEP] Verifying correct report for ${company} from ${reportUrls.length} candidates`);
+    
+    try {
+      const parsedResponse = await this.verifyCorrectReportWithGemini(reportUrls, company);
+      let doesFirstUrlExist = true;
+
+      if (parsedResponse.firstReportCompany) {
+        doesFirstUrlExist = await this.companyService.doesCompanyExist(parsedResponse.firstReportCompany);
+      }
       
       if (!parsedResponse) {
         console.log(`[WARNING] Failed to parse Gemini response for ${company} report verification, using first URL as fallback`);
-        console.log(`[DETAIL] Raw response: ${responseText.substring(0, 200)}...`);
-        return reportUrls[0]; // Fall back to first URL
+        return doesFirstUrlExist ? null : reportUrls[0]; // Fall back to first URL
       }
       
       const bestReportUrl = parsedResponse.bestReportUrl;
@@ -392,19 +402,19 @@ export class ReportFinderService {
 
       if (!bestReportUrl) {
         console.log(`[WARNING] No best report URL found for ${company}, using first URL as fallback`);
-        return null;
+        return doesFirstUrlExist ? null : reportUrls[0];
       }
 
       const doesCompanyExist = await this.companyService.doesCompanyExist(parsedResponse.companyName);
 
       if (doesCompanyExist) {
-        return reportUrls[0];
+        return doesFirstUrlExist ? null : reportUrls[0];
       }
       
       // Verify URL exists in our original list
       if (!reportUrls.includes(bestReportUrl)) {
         console.log(`[WARNING] Selected URL not in original list for ${company}, using first URL as fallback`);
-        return reportUrls[0];
+        return doesFirstUrlExist ? null : reportUrls[0];
       }
       
       return bestReportUrl;
