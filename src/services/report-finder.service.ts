@@ -197,7 +197,7 @@ export class ReportFinderService {
       console.log(`[STEP] Found ${searchResults.length} search results for ${company} ${targetYear} reports`, searchResults);
 
       // Process the search results to find a valid report
-      return await this.processSearchResultsForReport(company, searchResults, targetYear, null, 5, withEmissions);
+      return await this.processSearchResultsForReport(company, searchResults, targetYear, null, 2, withEmissions);
     } catch (error) {
       this.logger.error(`Error finding report with Gemini for ${company}: ${error.message}`);
       return null;
@@ -212,7 +212,7 @@ export class ReportFinderService {
     searchResults: any[], 
     expectedYear: number | null = null, 
     rejectYear: number | null = null,
-    maxAttempts: number = 5,
+    maxAttempts: number = 2,
     withEmissions: boolean = true
   ): Promise<{emissions: any, reportUrl: string} | null> {
     
@@ -398,8 +398,7 @@ export class ReportFinderService {
       const doesCompanyExist = await this.companyService.doesCompanyExist(parsedResponse.companyName);
 
       if (doesCompanyExist) {
-        const newReportUrls = reportUrls.filter(url => url !== bestReportUrl);
-        return await this.verifyCorrectReport(newReportUrls, company);
+        return reportUrls[0];
       }
       
       // Verify URL exists in our original list
