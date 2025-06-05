@@ -1275,7 +1275,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       if (revenueData.sourceUrl) {
         await this.sheetsApiService.updateValues(
           this.SPREADSHEET_ID,
-          `Analysed Data!AI${companyIndex + 2}`,
+          `Analysed Data!AH${companyIndex + 2}`,
           [['Annual Report', revenueData.sourceUrl]]
         );
       }
