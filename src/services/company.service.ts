@@ -1272,6 +1272,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         [['Annual Report', revenueData.sourceUrl]]
       );
 
+      if (revenueData.sourceUrl) {
+        await this.sheetsApiService.updateValues(
+          this.SPREADSHEET_ID,
+          `Analysed Data!AI${companyIndex + 2}`,
+          [['Annual Report', revenueData.sourceUrl]]
+        );
+      }
+
       console.log(`[RESULT] Successfully updated revenue for ${company} in 'Analysed Data' sheet`);
       return true;
     } catch (error) {
