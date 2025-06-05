@@ -213,7 +213,12 @@ export class ReportProcessingService {
 
         if (reportData.emissions.portfolioCompanies?.length > 0) {
           for (const portfolioCompany of reportData.emissions.portfolioCompanies) {
-            await this.processCompanyAfterEmissionsExtraction(portfolioCompany.company.name, portfolioCompany, reportData.reportUrl);
+            try { 
+              await this.processCompanyAfterEmissionsExtraction(portfolioCompany.company.name, portfolioCompany, reportData.reportUrl);
+            } catch (error) {
+              this.logger.error(`Error processing portfolio company ${portfolioCompany.company.name}: ${error.message}`);
+              continue;
+            }
           }
         }
         

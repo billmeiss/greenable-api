@@ -33,7 +33,6 @@ export class EmissionsReportService {
         Extract greenhouse gas emissions data from this sustainability/ESG report for ${company}.
 
         If the company has a portfolio of other companies, you must extract the emissions data for each company in the portfolio and return those emissions under the field "portfolioCompanies".
-        Do not return portfolio companies for mining resources, infrastructure, energy, or real estate companies.
         Only return portfolio companies for companies that are investment holding, or financial companies.
 
         You must check if Scope 1 is included.
@@ -114,7 +113,7 @@ export class EmissionsReportService {
             "company": "string",
             "notes": "string"
           },
-          "portfolioCompanies": {
+          "portfolioCompanies": Array<{
             "reportingPeriod": "string - the reporting year or period (e.g., '2022' or 'FY 2021-2022')",
             "standardUnit": "string - the standard unit used for emissions",
             "company": {
@@ -142,7 +141,7 @@ export class EmissionsReportService {
                   "14": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
                   "15": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
                 }
-              },
+              }>,
           }
         }
         
