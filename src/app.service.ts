@@ -203,7 +203,8 @@ export class AppService {
         await this.companyService.updateCompanyRevenue(name, {
           revenue: null,
           year: null,
-          source: revenue?.sourceUrl || 'Error occurred during retrieval',
+          source: null,
+          sourceUrl: revenue?.sourceUrl || 'Error occurred during retrieval',
           confidence: 1,
           currency: 'USD'
         });
