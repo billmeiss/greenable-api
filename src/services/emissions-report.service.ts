@@ -200,7 +200,7 @@ export class EmissionsReportService {
       
       // Create the main processing promise
       const result = await this.geminiApiService.handleGeminiCall(
-        () => this.geminiAiService.processPDF(reportUrl, extractionPrompt, 'esg'), 2, 1000, 10 * 60 * 1000
+        () => this.geminiAiService.processUrl(reportUrl, extractionPrompt, 'esg'), 2, 1000, 10 * 60 * 1000
       );
       
       

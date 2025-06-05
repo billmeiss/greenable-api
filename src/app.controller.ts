@@ -55,4 +55,9 @@ export class AppController {
   checkMissingScopes() {
     return this.appService.checkMissingScopes();
   }
+
+  @Post('/update-inconsistent-revenues')
+  updateInconsistentRevenues() {
+    return this.appService.updateInconsistentRevenues();
+  }
 }

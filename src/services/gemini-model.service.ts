@@ -295,6 +295,19 @@ Extra-territorial organizations and bodies
             The reportUrl field is required and must be a string.`
     };
 
+    // Annual report finder model
+    this.modelConfigs.annualReportFinder = {
+      model: 'gemini-2.5-flash-preview-05-20',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+      systemInstruction: `You will return responses in this JSON format:
+            {
+              "annualReportUrl": "The URL of the annual report"
+            }`
+
+    }
+
     // Direct report finder model
     this.modelConfigs.directReportFinder = {
       model: 'gemini-2.0-flash',
@@ -569,6 +582,20 @@ Extra-territorial organizations and bodies
             }`
           
     };
+
+    this.modelConfigs.revenueFromAnnualReport = {
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+      },
+      systemInstruction: `You will return responses in this JSON format:
+            {
+              "revenue": 0,
+              "currency": "The currency of the revenue",
+              "year": "The year of the revenue"
+            }`
+    }
 
     // Revenue model
     this.modelConfigs.revenue = {

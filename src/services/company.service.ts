@@ -7,6 +7,7 @@ import { sheets_v4 } from 'googleapis';
 import axios from 'axios';
 import { readFile } from 'fs/promises';
 import { GeminiAiService } from './gemini-ai.service';
+import { SearchService } from './search.service';
 
 // Add type definition for Gemini API response
 interface GeminiResponse {
@@ -61,6 +62,7 @@ export class CompanyService {
     private readonly geminiModelService: GeminiModelService,
     private readonly googleAuthService: GoogleAuthService,
     private readonly sheetsApiService: SheetsApiService,
+    private readonly searchService: SearchService,
   ) {}
 
   /**
@@ -300,7 +302,7 @@ export class CompanyService {
 
     try {
       const result = await this.geminiApiService.handleGeminiCall(
-        () => this.geminiAiService.processPDF(reportUrl, prompt, 'auditedCompanies'),
+        () => this.geminiAiService.processUrl(reportUrl, prompt, 'auditedCompanies'),
         2,
         1000,
         10 * 60 * 1000
@@ -369,6 +371,28 @@ export class CompanyService {
     }
   }
 
+  async searchForCompanyAnnualReport(companyName: string, year: string): Promise<string | null> {
+    const searchResults = await this.searchService.performWebSearch(`${companyName} ${year} annual report pdf`);
+
+    // Use gemini to check which one is the annual report based ont the results
+    const result = await this.geminiApiService.handleGeminiCall(
+      () => this.geminiModelService.getModel('annualReportFinder').generateContent({
+        contents: [{ role: 'user', parts: [{ text: `I need to find the annual report for ${companyName} in ${year}. Please return the link to the annual report in the JSON format. The results are: ${searchResults.map(result => result.link).join(', ')}. If you cannot find the annual report, return null.` }] }],
+      })
+    );
+
+    const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+
+    console.log(parsedResponse);
+
+    if (!parsedResponse || !parsedResponse.annualReportUrl) {
+      this.logger.warn(`Failed to get annual report for ${companyName}`);
+      return null;
+    }
+
+    return parsedResponse.annualReportUrl;
+  }
+
   /**
    * Get company revenue data
    */
@@ -383,7 +407,7 @@ export class CompanyService {
         }
       }
       
-      // First try getting revenue from Financial Modeling Prep API
+      // First try getting revenue data from Financial Modeling Prep API
       const fmpRevenueData = await this.getCompanyRevenueFromFMP(companyName, targetYear);
       console.log(targetYear, fmpRevenueData);
       if (fmpRevenueData && fmpRevenueData.year === targetYear) {
@@ -393,33 +417,68 @@ export class CompanyService {
       
       // If FMP data not found, fall back to Gemini
       this.logger.log(`No revenue data found in FMP for ${companyName}, using Gemini fallback`);
-      
-      const revenueModel = this.geminiModelService.getModel('revenue');
-      
+            
       // Create user prompt with company and period information
-      const userPrompt = `I need accurate financial information about ${companyName}${reportingPeriod ? ' specifically for the same period as their emissions report: ' + reportingPeriod : ' for the most recent period'}.${targetYear !== 'recent' ? ' Please focus on finding revenue data for the year ' + targetYear + '.' : ''}${reportingPeriod ? ' IMPORTANT: Please prioritize finding revenue data that matches the reporting period ' + reportingPeriod + ' to ensure data consistency with the emissions report.' : ''}`;
+      let userPrompt = `I need accurate financial information about ${companyName}${reportingPeriod ? ' specifically for the same period as their emissions report: ' + reportingPeriod : ' for the most recent period'}.${targetYear !== 'recent' ? ' Please focus on finding revenue data for the year ' + targetYear + '.' : ''}${reportingPeriod ? ' IMPORTANT: Please prioritize finding revenue data that matches the reporting period ' + reportingPeriod + ' to ensure data consistency with the emissions report.' : ''}`;
+
       
-      const result = await this.geminiApiService.handleGeminiCall(
-        () => revenueModel.generateContent({
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        })
-      );
+      let result;
+
+      // Check if the company has an annual report
+      const annualReport = await this.searchForCompanyAnnualReport(companyName, targetYear);
+      if (annualReport) {
+        this.logger.log(`Found annual report for ${companyName}: ${annualReport}`);
+        userPrompt += `\n\nIMPORTANT: Please use the revenue data from the attached pdf to ensure data consistency with the emissions report. Only return the numerical value of the revenue. It must be in the specified JSON format. "revenue": 0, "currency": "The currency of the revenue", "year": "The year of the revenue". Revenue must be converted to single $ value, not thousands or millions.`;
+
+        const response = await this.geminiAiService.processUrl(annualReport, userPrompt, 'revenueFromAnnualReport');
+        console.log(response);
+        const parsedResponse = this.geminiApiService.safelyParseJson(response);
+        result = {
+          ...parsedResponse,
+          source: 'Annual Report',
+          sourceUrl: annualReport,
+          year: targetYear
+        }
+      } else {
+        return null;
+      }
       
       if (!result || !result) {
         throw new Error('Failed to generate content from Gemini');
       }
       
-      const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
-      
-      if (!parsedResponse || !parsedResponse.revenue) {
-        this.logger.warn(`Failed to get revenue data for ${companyName}`);
-        return null;
-      }
-      
-      return parsedResponse as RevenueData;
+      return result as RevenueData;
     } catch (error) {
       this.logger.error(`Error getting revenue for ${companyName}: ${error.message}`);
-      return null;
+      
+      // Capture the annual report URL if it was found before the error
+      try {
+        const targetYear = reportingPeriod ? (this.extractYearFromPeriod(reportingPeriod)?.toString() || 'recent') : 'recent';
+        const annualReport = await this.searchForCompanyAnnualReport(companyName, targetYear);
+        
+        if (annualReport) {
+          this.logger.log(`Despite error, found annual report for ${companyName}: ${annualReport}`);
+          return {
+            revenue: null,
+            year: targetYear,
+            source: 'Annual Report (Error occurred during processing)',
+            confidence: 1,
+            sourceUrl: annualReport,
+            currency: 'USD'
+          };
+        }
+      } catch (innerError) {
+        this.logger.error(`Error in error handler when getting annual report URL: ${innerError.message}`);
+      }
+      
+      // If no annual report was found or an error occurred while finding it, return a minimal valid object
+      return {
+        revenue: null,
+        year: reportingPeriod ? (this.extractYearFromPeriod(reportingPeriod)?.toString() || 'unknown') : 'unknown',
+        source: 'Error occurred during retrieval',
+        confidence: 0,
+        currency: 'USD'
+      };
     }
   }
 
@@ -591,6 +650,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         scope3Cat15: row[27],
         category: row[30],
         revenueSource: row[33],
+        revenueUrl: row[34],
         notes: row[32]
       })).filter(Boolean);
 
@@ -710,7 +770,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     `;
 
     const result = await this.geminiApiService.handleGeminiCall(
-      () => this.geminiAiService.processPDF(reportUrl, prompt, 'missingScopes'), 2, 5000, 60 * 1000 * 3
+      () => this.geminiAiService.processUrl(reportUrl, prompt, 'missingScopes'), 2, 5000, 60 * 1000 * 3
     );
 
     console.log(result);
@@ -1198,11 +1258,29 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         return false;
       }
 
+      if (revenueData.revenue === null) {
+        await this.sheetsApiService.updateValues(
+          this.SPREADSHEET_ID,
+          `Analysed Data!AL${companyIndex + 2}`,
+          [[null, revenueData.source]]
+        );
+
+        return true;
+        
+      }
+
       // Update the cell with the new revenue data and year
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
         `Analysed Data!F${companyIndex + 2}`,
         [[revenueData.revenue, revenueData.currency]]
+      );
+
+      // Update the source url
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!AH${companyIndex + 2}`,
+        [['Annual Report', revenueData.sourceUrl]]
       );
 
       console.log(`[RESULT] Successfully updated revenue for ${company} in 'Analysed Data' sheet`);

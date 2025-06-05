@@ -5,7 +5,7 @@ import { GeminiModelService } from './services/gemini-model.service';
 import { GeminiApiService } from './services/gemini-api.service';
 import { EmissionsReportService } from './services/emissions-report.service';
 import { ReportFinderService } from './services/report-finder.service';
-
+import axios from 'axios';
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
@@ -177,6 +177,39 @@ export class AppService {
           continue;
         }
       }
+    }
+  }
+
+  async updateInconsistentRevenues(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    for (const company of companies) {
+      const { name, reportingPeriod, revenueYear, revenueUrl } = company;
+      // Check if the revenue source is not Financial Modeling Prep or Vertex AI
+      if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
+        continue;
+      }
+      // Check if the existing revenue source returns a 404
+      try {
+        const response = await axios.get(revenueUrl);
+        if (response.status === 200) continue;
+      } catch (error) {
+        console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
+      }
+      // Update the revenue source to the annual report
+      const revenue = await this.companyService.getCompanyRevenue(name, revenueYear);
+      console.log(revenue);
+      if (!revenue || !revenue.revenue) {
+        console.log(`[ERROR] No annual report found for ${name}`);
+        await this.companyService.updateCompanyRevenue(name, {
+          revenue: null,
+          year: null,
+          source: revenue?.sourceUrl || 'Error occurred during retrieval',
+          confidence: 1,
+          currency: 'USD'
+        });
+        continue;
+      }
+      await this.companyService.updateCompanyRevenue(name, revenue);
     }
   }
 }
