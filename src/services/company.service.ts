@@ -1258,28 +1258,17 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         return false;
       }
 
-      if (revenueData.revenue === null) {
-        await this.sheetsApiService.updateValues(
-          this.SPREADSHEET_ID,
-          `Analysed Data!AL${companyIndex + 2}`,
-          [[null, revenueData.source]]
-        );
-
-        return true;
-        
-      }
-
       // Update the cell with the new revenue data and year
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!F${companyIndex + 2}`,
+        `Analysed Data!AN${companyIndex + 2}`,
         [[revenueData.revenue, revenueData.currency]]
       );
 
       // Update the source url
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AH${companyIndex + 2}`,
+        `Analysed Data!AL${companyIndex + 2}`,
         [['Annual Report', revenueData.sourceUrl]]
       );
 
