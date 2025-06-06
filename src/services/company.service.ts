@@ -372,22 +372,33 @@ export class CompanyService {
   }
 
   async searchForCompanyAnnualReport(companyName: string, year: string): Promise<string | null> {
-    const searchResults = await this.searchService.performWebSearch(`${companyName} ${year} annual report pdf`);
+    const searchResults = await this.searchService.performWebSearch(`${companyName} ${year} annual report revenue pdf`);
 
     // Use gemini to check which one is the annual report based ont the results
     const result = await this.geminiApiService.handleGeminiCall(
       () => this.geminiModelService.getModel('annualReportFinder').generateContent({
-        contents: [{ role: 'user', parts: [{ text: `I need to find the annual report for ${companyName} in ${year}. Please return the link to the annual report in the JSON format. The results are: ${searchResults.map(result => result.link).join(', ')}. If you cannot find the annual report, return null.` }] }],
+        contents: [{ role: 'user', parts: [{ text: `I need to find the annual report for ${companyName} in ${year}. Please return the link to the annual report, or a document containing its revenue in the JSON format. The results are: ${searchResults.map(result => result.link).join(', ')}. If you cannot find the annual report, return null.` }] }],
       })
     );
 
-    const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+    let parsedResponse = this.geminiApiService.safelyParseJson(result?.candidates[0]?.content?.parts[0]?.text);
 
-    console.log(parsedResponse);
+    console.log(result);
 
     if (!parsedResponse || !parsedResponse.annualReportUrl) {
-      this.logger.warn(`Failed to get annual report for ${companyName}`);
-      return null;
+      // Try again with a different search query
+      const searchResults = await this.searchService.performWebSearch(`${companyName} ${year} revenue`);
+      const result = await this.geminiApiService.handleGeminiCall(
+        () => this.geminiModelService.getModel('annualReportFinder').generateContent({
+          contents: [{ role: 'user', parts: [{ text: `I need to find the revenue for ${companyName} in ${year}. Please return the link to any website or document containing or referencing its revenue in the JSON format. It can be an external website, press release or a document on the company's website. The results are: ${searchResults.map(result => { return `link: ${result.link} - title: ${result.title} - snippet: ${result.snippet}` }).join(', ')}. If you cannot find any relevant report with revenue, return the most likely link to the annual report.` }] }],
+        })
+      );
+      console.log(result?.candidates[0]?.content?.parts[0]?.text);
+      parsedResponse = this.geminiApiService.safelyParseJson(result?.candidates[0]?.content?.parts[0]?.text);
+
+      if (!parsedResponse || !parsedResponse.annualReportUrl) {
+        return null;
+      }
     }
 
     return parsedResponse.annualReportUrl;
@@ -618,7 +629,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Use the SheetsApiService with built-in exponential backoff
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow || 2}:AI`
+        `'Analysed Data'!A${fromRow || 2}:AO`
       );
       
       const rows = data.values || [];
@@ -651,6 +662,9 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         category: row[30],
         revenueSource: row[33],
         revenueUrl: row[34],
+        newRevenueUrl: row[38],
+        newRevenueAmount: row[39],
+        newRevenueCurrency: row[40],
         notes: row[32]
       })).filter(Boolean);
 
@@ -1491,6 +1505,39 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     } catch (error) {
       console.log(`[ERROR] Error getting attempts from sheet: ${error.message}`);
       return [];
+    }
+  }
+
+  async updateNewRevenue(company: string, revenueData: any): Promise<boolean> {
+    try {
+      console.log(`[STEP] Updating new revenue for ${company} in 'Analysed Data' sheet`);
+      
+      // Find the row index of the company in the 'Analysed Data' sheet
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!A2:E`
+      );
+
+      const rows = data.values || [];
+      const companyIndex = rows.findIndex(row => row[0] === company);
+
+      if (companyIndex === -1) {
+        console.log(`[ERROR] Company ${company} not found in 'Analysed Data' sheet`);
+        return false;
+      }
+
+      // Update the cell with the new revenue data
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!AN${companyIndex + 2}`,
+        [[revenueData.revenue, revenueData.currency]]
+      );
+
+      console.log(`[RESULT] Successfully updated new revenue for ${company} in 'Analysed Data' sheet`);
+      return true;
+    } catch (error) {
+      console.log(`[ERROR] Error updating new revenue for ${company}: ${error.message}`);
+      return false;
     }
   }
 }

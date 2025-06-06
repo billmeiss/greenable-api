@@ -303,7 +303,7 @@ Extra-territorial organizations and bodies
       },
       systemInstruction: `You will return responses in this JSON format:
             {
-              "annualReportUrl": "The URL of the annual report"
+              "annualReportUrl": "The URL of the document containing the revenue"
             }`
 
     }

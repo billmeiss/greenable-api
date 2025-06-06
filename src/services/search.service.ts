@@ -42,6 +42,8 @@ export class SearchService {
           displayed_link: result.displayed_link || '',
         };
       });
+
+      console.log(results);
       
       console.log(`Found ${results.length} search results`);
       return results;

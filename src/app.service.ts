@@ -183,18 +183,36 @@ export class AppService {
   async updateInconsistentRevenues(): Promise<any> {
     const companies = await this.companyService.getExistingCompaniesFromSheet();
     for (const company of companies) {
-      const { name, reportingPeriod, revenueYear, revenueUrl } = company;
+      const { name, reportingPeriod, revenueYear, revenueUrl, newRevenueUrl, country, newRevenueCurrency, newRevenueAmount } = company;
+      if (!newRevenueUrl) continue;
+      if (newRevenueAmount && newRevenueCurrency !== 'USD') {
+        const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, newRevenueCurrency);
+        if (exchangeRate) {
+          const updatedRevenue = newRevenueAmount / exchangeRate;
+          await this.companyService.updateNewRevenue(name, {
+            revenue: updatedRevenue,
+            currency: 'USD'
+          });
+        }
+        continue;
+      }
       // Check if the revenue source is not Financial Modeling Prep or Vertex AI
       if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
         continue;
       }
-      // Check if the existing revenue source returns a 404
-      try {
-        const response = await axios.get(revenueUrl);
-        if (response.status === 200) continue;
-      } catch (error) {
-        console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
+      console.log(newRevenueUrl);
+      // If the new revenue url is not an error, continu
+      if (newRevenueAmount > 0 && !newRevenueUrl?.includes('Error')) {
+        continue;
       }
+
+      // // Check if the existing revenue source returns a 404
+      // try {
+      //   const response = await axios.get(revenueUrl);
+      //   if (response.status === 200) continue;
+      // } catch (error) {
+      //   console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
+      // }
       // Update the revenue source to the annual report
       const revenue = await this.companyService.getCompanyRevenue(name, revenueYear);
       console.log(revenue);
@@ -210,7 +228,21 @@ export class AppService {
         });
         continue;
       }
-      await this.companyService.updateCompanyRevenue(name, revenue);
+      let updatedRevenue = revenue.revenue;
+      let updatedCurrency = revenue.currency;
+      if (revenue.currency !== 'USD') {
+        // Look up the exchange rate for the reporting period in rates.json
+        const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, revenue.currency);
+        if (exchangeRate) {
+          updatedRevenue = revenue.revenue / exchangeRate;
+          updatedCurrency = 'USD';
+        }
+      }
+      await this.companyService.updateCompanyRevenue(name, {
+        ...revenue,
+        revenue: updatedRevenue,
+        currency: updatedCurrency
+      });
     }
   }
 }

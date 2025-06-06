@@ -31,46 +31,60 @@ export class GeminiAiService {
 
   /**
    * Upload a remote PDF file and wait for it to be processed
-   * @param url URL of the PDF file
+   * @param url URL of the PDF file or local file path
    * @param displayName Display name for the file
    * @returns Processed file object
    */
   async uploadRemotePDF(url: string, displayName: string) {
     try {
-      console.log(`[INFO] Fetching PDF from: ${url}`);
+      console.log(`[INFO] Processing file: ${url}`);
       
-      // Set proper headers for any file download
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; GreenableAPI/1.0)',
-          // add headers to avoid 403
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'credentials': 'include',
-          'Upgrade-Insecure-Requests': '1',          
-        },
-        redirect: 'follow' // Follow redirects automatically
-      });
+      let pdfBuffer: ArrayBuffer;
+      
+      // Check if it's a local file path (file:// URL)
+      if (url.startsWith('file://')) {
+        const filePath = url.replace('file://', '');
+        console.log(`[INFO] Reading local file: ${filePath}`);
+        
+        const fileBuffer = await fsPromises.readFile(filePath);
+        pdfBuffer = fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength);
+        console.log(`[INFO] Read local file size: ${pdfBuffer.byteLength} bytes`);
+      } else {
+        // Handle remote URLs
+        console.log(`[INFO] Fetching PDF from: ${url}`);
+        
+        // Set proper headers for any file download
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; GreenableAPI/1.0)',
+            // add headers to avoid 403
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'credentials': 'include',
+            'Upgrade-Insecure-Requests': '1',          
+          },
+          redirect: 'follow' // Follow redirects automatically
+        });
 
-      if (!response.ok) {
-        console.error(`[ERROR] Failed to fetch PDF: ${response.status} ${response.statusText}`);
-        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+          console.error(`[ERROR] Failed to fetch PDF: ${response.status} ${response.statusText}`);
+          throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+        }
+
+        // Check content type
+        const contentType = response.headers.get('content-type');
+        console.log(`[INFO] Content-Type: ${contentType}`);
+        
+        // Check content length
+        const contentLength = response.headers.get('content-length');
+        console.log(`[INFO] Content-Length: ${contentLength || 'unknown'} bytes`);
+
+        // Download the PDF content
+        pdfBuffer = await response.arrayBuffer();
+        console.log(`[INFO] Downloaded file size: ${pdfBuffer.byteLength} bytes`);
       }
-
-      // Check content type
-      const contentType = response.headers.get('content-type');
-      console.log(`[INFO] Content-Type: ${contentType}`);
-      
-      
-      // Check content length
-      const contentLength = response.headers.get('content-length');
-      console.log(`[INFO] Content-Length: ${contentLength || 'unknown'} bytes`);
-
-      // Download the PDF content
-      const pdfBuffer = await response.arrayBuffer();
-      console.log(`[INFO] Downloaded file size: ${pdfBuffer.byteLength} bytes`);
       
       // Check if the file is too large
       const FILE_SIZE_LIMIT = 200 * 1024 * 1024; // 200MB in bytes
@@ -207,7 +221,7 @@ export class GeminiAiService {
       throw error;
     } finally {
       // Close browser tabs but keep browser instance for reuse
-      await this.htmlPdf.closeBrowserTabs();
+      // await this.htmlPdf.closeBrowserTabs();
     }
   }
 
