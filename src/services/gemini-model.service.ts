@@ -297,7 +297,7 @@ Extra-territorial organizations and bodies
 
     // Annual report finder model
     this.modelConfigs.annualReportFinder = {
-      model: 'gemini-2.5-flash-preview-05-20',
+      model: 'gemini-2.0-flash',
       generationConfig: {
         responseMimeType: 'application/json',
       },
