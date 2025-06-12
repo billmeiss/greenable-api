@@ -1,0 +1,41 @@
+// FORMULA SOLUTIONS FOR CHECKING NUMERICAL VALUES IN ADJACENT CELLS (J:AB)
+
+// OPTION 1: Check if current cell equals the cell above (exact match)
+// Place this in row 2 and copy across columns J:AB
+=IF(ROW()=1, "", IF(J1=J2, "MATCH", ""))
+
+// OPTION 2: Check if cells contain any common digits (for text containing numbers)
+// This checks if any individual digits appear in both cells
+=IF(ROW()=1, "", IF(SUMPRODUCT(--(ISNUMBER(SEARCH({0;1;2;3;4;5;6;7;8;9}, J1&""))))*--(ISNUMBER(SEARCH({0;1;2;3;4;5;6;7;8;9}, J2&""))))>0, "COMMON DIGITS", ""))
+
+// OPTION 3: Extract and compare all numbers from text cells
+// This is more complex and requires helper columns or array formulas
+
+// OPTION 4: Simple numerical comparison with error handling
+=IF(ROW()=1, "", IF(AND(ISNUMBER(J1), ISNUMBER(J2)), IF(J1=J2, "NUMERICAL MATCH", ""), IF(J1=J2, "TEXT MATCH", "")))
+
+// OPTION 5: Check for partial number matches within text
+// This looks for common number sequences
+=IF(ROW()=1, "", IF(SUMPRODUCT(--(LEN(J1&"")>0), --(LEN(J2&"")>0), --(ISNUMBER(SEARCH(TRIM(MID(SUBSTITUTE(J1&" ", " ", REPT(" ", 100)), (ROW(INDIRECT("1:"&LEN(J1&"")-LEN(SUBSTITUTE(J1&"", " ", ""))+1))-1)*100+1, 100)), J2&""))))>0, "PARTIAL MATCH", ""))
+
+// RECOMMENDED SOLUTION: Universal checker for any matching content
+// This works for both numbers and text, place in J2 and copy across/down
+=IF(ROW()=1, "", IF(INDIRECT(ADDRESS(ROW()-1, COLUMN()))=INDIRECT(ADDRESS(ROW(), COLUMN())), "MATCH", ""))
+
+// FOR ARRAY FORMULA (Excel 365/Google Sheets): Check entire range at once
+// This creates a dynamic array showing matches across all columns J:AB
+=IF(ROW(J2:AB5300)=1, "", IF(OFFSET(J2:AB5300, -1, 0)=J2:AB5300, "MATCH", ""))
+
+// SPECIFIC REQUEST: Formula for row 10 to check for duplicate pure numbers between row 9 and row 10
+// Only compares numbers, ignores text and blanks, returns "yes" if any duplicates found
+=IF(SUMPRODUCT(--(ISNUMBER(J9:AB9)), --(ISNUMBER(J10:AB10)), --(J9:AB9=J10:AB10))>0, "yes", "")
+
+// INDIVIDUAL CELL COMPARISON: Check each cell against the cell directly above it
+// Place this formula in each cell (example for J10 checking against J9)
+// Only compares if both cells contain pure numbers, returns "yes" if match
+=IF(AND(ISNUMBER(J9), ISNUMBER(J10)), IF(J9=J10, "yes", ""), "")
+
+// SINGLE FORMULA FOR ALL INDIVIDUAL CELL PAIRS: Checks each cell pair individually
+// Place this in one cell - checks J9 vs J10, K9 vs K10, L9 vs L10, etc.
+// Returns "yes" if ANY individual pair of pure numbers match, "no" if no matches
+=IF(SUMPRODUCT(--(ISNUMBER(J9:AB9) * ISNUMBER(J10:AB10) * (J9:AB9=J10:AB10)))>0, "yes", "no")

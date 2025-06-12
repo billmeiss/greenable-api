@@ -60,4 +60,9 @@ export class AppController {
   updateInconsistentRevenues() {
     return this.appService.updateInconsistentRevenues();
   }
+
+  @Post('/check-incomplete-revenues')
+  checkIncompleteRevenues() {
+    return this.appService.checkIncompleteRevenues();
+  }
 }

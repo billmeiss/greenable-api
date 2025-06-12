@@ -1,0 +1,1 @@
+=IF(OR(AND(IF(ISTEXT(J10), REGEXMATCH(J10, "Not specified"), FALSE), IF(ISTEXT(K10), REGEXMATCH(K10, "Not specified"), FALSE)), AND(IF(ISTEXT(J10), REGEXMATCH(J10, "Not specified"), FALSE), IF(ISTEXT(L10), REGEXMATCH(L10, "Not specified"), FALSE))), "VALIDATION ERROR: Both fields contain 'Not specified'", "")

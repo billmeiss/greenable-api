@@ -629,7 +629,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Use the SheetsApiService with built-in exponential backoff
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow || 2}:AO`
+        `'Analysed Data'!A${fromRow || 2}:AR`
       );
       
       const rows = data.values || [];
@@ -665,7 +665,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         newRevenueUrl: row[38],
         newRevenueAmount: row[39],
         newRevenueCurrency: row[40],
-        notes: row[32]
+        notes: row[32],
+        scope3Mismatch: row[43]
       })).filter(Boolean);
 
       return companies;
@@ -1537,6 +1538,93 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       return true;
     } catch (error) {
       console.log(`[ERROR] Error updating new revenue for ${company}: ${error.message}`);
+      return false;
+    }
+  }
+
+  async checkMismatchedScope3(company: string, reportUrl: string, scope3Values): Promise<any> {
+    // Call Gemini to check if the scope3 values are correct
+    return await this.geminiAiService.processUrl(reportUrl, 
+      `
+        You are a helpful assistant that checks if the scope3 values are correct.
+        Look for tables, charts, and text that explicitly mention greenhouse gas emissions.
+        Ensure all values are converted to the same unit (preferably tons of CO2 equivalent).
+        Identify the reporting period for the emissions data.
+        
+        For scope 3 emissions, carefully analyze which categories (1-15) are reported:
+        1. Purchased goods and services
+        2. Capital goods
+        3. Fuel- and energy-related activities
+        4. Upstream transportation and distribution
+        5. Waste generated in operations
+        6. Business travel
+        7. Employee commuting
+        8. Upstream leased assets
+        9. Downstream transportation and distribution
+        10. Processing of sold products
+        11. Use of sold products
+        12. End-of-life treatment of sold products
+        13. Downstream leased assets
+        14. Franchises
+        15. Investments
+
+        The exisitng scope3 values are: ${JSON.stringify(scope3Values)}
+        Make sure to gather new values from the report, and ignore the existing values when scanning the report..
+        The report url is: ${reportUrl}
+        Please check each individual scope 3 value and the sum, since I've already determined that there's a mismatch. Make sure the total sum was not hallucinated or that the individual scope 3 categories were not extracted incorrectly.
+        Your response should be a JSON object with the following fields:
+        {
+          "isCorrect": true,
+          "reason": "The scope3 values are correct",
+          "scope3Values": {
+            "scope3Total": 100,
+            "scope3Cat1": 100,
+            "scope3Cat2": 100,
+            "scope3Cat3": 100,
+            "scope3Cat4": 100,
+            "scope3Cat5": 100,
+            "scope3Cat6": 100,
+            "scope3Cat7": 100,
+            "scope3Cat8": 100,
+            "scope3Cat9": 100,
+            "scope3Cat10": 100,
+            "scope3Cat11": 100,
+            "scope3Cat12": 100,
+            "scope3Cat13": 100,
+            "scope3Cat14": 100,
+            "scope3Cat15": 100,
+          }
+        }
+      `, 
+    )
+  }
+
+  async updateScope3(company: string, scope3Values: any): Promise<boolean> {
+    try {
+      console.log(`[STEP] Updating scope3 for ${company} in 'Analysed Data' sheet`);
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!A2:E`
+      );
+
+      const rows = data.values || [];
+      const companyIndex = rows.findIndex(row => row[0] === company);
+
+      if (companyIndex === -1) {
+        console.log(`[ERROR] Company ${company} not found in 'Analysed Data' sheet`);
+        return false;
+      }
+
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!AS${companyIndex + 2}`,
+        [[scope3Values.scope3Values.scope3Total, scope3Values.scope3Values.scope3Cat1, scope3Values.scope3Values.scope3Cat2, scope3Values.scope3Values.scope3Cat3, scope3Values.scope3Values.scope3Cat4, scope3Values.scope3Values.scope3Cat5, scope3Values.scope3Values.scope3Cat6, scope3Values.scope3Values.scope3Cat7, scope3Values.scope3Values.scope3Cat8, scope3Values.scope3Values.scope3Cat9, scope3Values.scope3Values.scope3Cat10, scope3Values.scope3Values.scope3Cat11, scope3Values.scope3Values.scope3Cat12, scope3Values.scope3Values.scope3Cat13, scope3Values.scope3Values.scope3Cat14, scope3Values.scope3Values.scope3Cat15]]
+      );
+
+      console.log(`[RESULT] Successfully updated scope3 for ${company} in 'Analysed Data' sheet`);
+      return true;
+    } catch (error) {
+      console.log(`[ERROR] Error updating scope3 for ${company}: ${error.message}`);
       return false;
     }
   }

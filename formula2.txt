@@ -1,0 +1,1 @@
+=IF(SUMPRODUCT(--(REGEXMATCH(TEXT(N5:AB5,"@"), "Not specified"))) > 0, IF(AND(AND(J5="",K5="",L5=""), SUMPRODUCT(--(REGEXMATCH(TEXT(J5:L5,"@"), "Not specified"))) > 0, SUMPRODUCT(IF(ISTEXT(N5:AB5),0,N5:AB5)) = M5), "No", IF(AND(M5<>"", SUMPRODUCT(IF(ISTEXT(N5:AB5),0,N5:AB5)) < M5), "Yes", "No")), "")

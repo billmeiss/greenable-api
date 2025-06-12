@@ -245,6 +245,37 @@ export class AppService {
       });
     }
   }
+
+  async checkIncompleteRevenues(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    for (const company of companies) {
+      const { name, reportUrl, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15, scope3Mismatch } = company;
+      if (!scope3Mismatch) {
+        continue;
+      }
+      const scope3Values = await this.companyService.checkMismatchedScope3(name, reportUrl, {
+        scope3,
+        scope3Cat1,
+        scope3Cat2,
+        scope3Cat3,
+        scope3Cat4,
+        scope3Cat5,
+        scope3Cat6,
+        scope3Cat7,
+        scope3Cat8,
+        scope3Cat9,
+        scope3Cat10,
+        scope3Cat11,
+        scope3Cat12,
+        scope3Cat13,
+        scope3Cat14,
+        scope3Cat15,
+      });
+      if (!scope3Values.isCorrect) {
+        await this.companyService.updateScope3(name, scope3Values);
+      }
+    }
+  }
 }
 
 

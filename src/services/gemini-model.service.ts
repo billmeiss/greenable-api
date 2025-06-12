@@ -14,11 +14,11 @@ export class GeminiModelService {
   private initializeModelConfigs(): void {
     // Generic model
     this.modelConfigs.generic = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-pro-preview-06-05',
     };
 
     this.modelConfigs.companyNameChecker = {
-      model: 'gemini-2.5-pro-preview-05-06',
+      model: 'gemini-2.5-pro-preview-06-05',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -29,7 +29,7 @@ export class GeminiModelService {
     };
 
     this.modelConfigs.companyCategory = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         temperature: 0.1,
       },
@@ -245,7 +245,7 @@ Extra-territorial organizations and bodies
 
     // Related companies model
     this.modelConfigs.relatedCompanies = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-pro-preview-06-05',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -256,7 +256,7 @@ Extra-territorial organizations and bodies
     };
 
     this.modelConfigs.countryFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -270,7 +270,7 @@ Extra-territorial organizations and bodies
 
     // Parent company finder model
     this.modelConfigs.parentCompanyFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -282,7 +282,7 @@ Extra-territorial organizations and bodies
 
     // Report finder model
     this.modelConfigs.reportFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         temperature: 0.1,
       },
@@ -297,7 +297,7 @@ Extra-territorial organizations and bodies
 
     // Annual report finder model
     this.modelConfigs.annualReportFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -310,7 +310,7 @@ Extra-territorial organizations and bodies
 
     // Direct report finder model
     this.modelConfigs.directReportFinder = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -323,7 +323,7 @@ Extra-territorial organizations and bodies
     };
 
     this.modelConfigs.auditedCompanies = {
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-2.5-flash-preview-05-20',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
@@ -337,7 +337,7 @@ Extra-territorial organizations and bodies
     }
 
     this.modelConfigs.missingScopes = {
-      model: 'gemini-2.5-pro-preview-05-06',
+      model: 'gemini-2.0-flash',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
@@ -433,7 +433,7 @@ Extra-territorial organizations and bodies
 
     // ESG model
     this.modelConfigs.esg = {
-      model: 'gemini-2.5-pro-preview-05-06',
+      model: 'gemini-2.5-pro-preview-06-05',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.1,
@@ -584,7 +584,7 @@ Extra-territorial organizations and bodies
     };
 
     this.modelConfigs.revenueFromAnnualReport = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-pro-preview-06-05',
       generationConfig: {
         temperature: 0.1,
         responseMimeType: 'application/json',
@@ -599,7 +599,7 @@ Extra-territorial organizations and bodies
 
     // Revenue model
     this.modelConfigs.revenue = {
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-pro-preview-06-05',
       generationConfig: {
         temperature: 0.1,
         tools: [{googleSearch: {}}],

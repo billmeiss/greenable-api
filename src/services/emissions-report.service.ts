@@ -35,23 +35,25 @@ export class EmissionsReportService {
         If the company has a portfolio of other companies, you must extract the emissions data for each company in the portfolio and return those emissions under the field "portfolioCompanies".
         Only return portfolio companies for companies that are investment holding, or financial companies.
 
-        You must check if Scope 1 is included.
-      You must check if Scope 2 is included.
-      You must check if Scope 3 Category 1 is included.
-      You must check if Scope 3 Category 2 is included.
-      You must check if Scope 3 Category 3 is included.
-      You must check if Scope 3 Category 4 is included.
-      You must check if Scope 3 Category 5 is included.
-      You must check if Scope 3 Category 6 is included.
-      You must check if Scope 3 Category 7 is included.
-      You must check if Scope 3 Category 8 is included.
-      You must check if Scope 3 Category 9 is included.
-      You must check if Scope 3 Category 10 is included.
-      You must check if Scope 3 Category 11 is included.
-      You must check if Scope 3 Category 12 is included.
-      You must check if Scope 3 Category 13 is included.
-      You must check if Scope 3 Category 14 is included.
-      You must check if Scope 3 Category 15 is included.
+        If a value is only provided for Scope 1&2 total, you must check if Scope 1 is included in the calculations.
+        If a value is only provided for Scope 1&2 total, you must check if Scope 2 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 1 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 2 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 3 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 4 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 5 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 6 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 7 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 8 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 9 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 10 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 11 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 12 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 13 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 14 is included in the calculations.
+        If a value is only provided for Scope 3 total, you must check if Scope 3 Category 15 is included in the calculations.
+
+        If there is a mismatch between the scope 3 values and the total, recheck your work before concluding that the values are included in the calculations.
 
       -This is because sometimes a report will mention scope 3 but not include any of the categories. So we need to confirm that none are mentioned. And if they are return their values. Or at least what scope were included in calculations.
       -This is because sometimes a report will mention Scope 1 & 2 total but not differentiate between the scope 1 and scope 2. So we need to confirm if their values are mentioned or at least what scopes were included in calculations.

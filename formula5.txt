@@ -1,0 +1,38 @@
+// GOOGLE SHEETS FORMULA FOR ROW 2: Check if sum of N2:AB2 equals M2
+
+// BASIC VERSION: Returns TRUE if sum equals M2, FALSE otherwise
+=SUM(N2:AB2)=M2
+
+// USER-FRIENDLY VERSION: Returns "YES" if sum equals M2, "NO" otherwise
+=IF(SUM(N2:AB2)=M2, "YES", "NO")
+
+// WITH ERROR HANDLING: Handles cases where M2 might be blank or non-numeric
+=IF(ISNUMBER(M2), IF(SUM(N2:AB2)=M2, "YES", "NO"), "")
+
+// DETAILED VERSION: Shows the actual sum and comparison
+=IF(SUM(N2:AB2)=M2, "MATCH: " & SUM(N2:AB2), "NO MATCH: " & SUM(N2:AB2) & " ≠ " & M2)
+
+// RECOMMENDED: Simple and clean
+=SUM(N2:AB2)=M2
+
+// WITH REGEX CHECK: Ensures no cells contain "not specified" AND sum equals M2
+// Returns TRUE only if both conditions are met
+=AND(SUMPRODUCT(--(REGEXMATCH(N2:AB2&"", "(?i)not specified")))=0, SUM(N2:AB2)=M2)
+
+// USER-FRIENDLY WITH REGEX: Returns "YES" if conditions met, "NO" otherwise
+=IF(AND(SUMPRODUCT(--(REGEXMATCH(N2:AB2&"", "(?i)not specified")))=0, SUM(N2:AB2)=M2), "YES", "NO")
+
+// WITH DETAILED ERROR MESSAGES: Shows why it failed
+=IF(SUMPRODUCT(--(REGEXMATCH(N2:AB2&"", "(?i)not specified")))>0, "CONTAINS 'NOT SPECIFIED'", IF(SUM(N2:AB2)=M2, "MATCH", "SUM MISMATCH"))
+
+// ALTERNATIVE REGEX VERSION: Case-insensitive check for "not specified"
+=IF(AND(SUMPRODUCT(--(REGEXMATCH(N2:AB2&"", "^(?i).*not specified.*$")))=0, SUM(N2:AB2)=M2), "YES", "NO")
+
+// DETAILED VERSION WITH SUM DISPLAYED: Shows sum and detailed status
+=IF(SUMPRODUCT(--(REGEXMATCH(N2:AB2&"", "(?i)not specified")))>0, "ERROR: Contains 'Not Specified' | Sum: " & SUM(N2:AB2), IF(SUM(N2:AB2)=M2, "MATCH: Sum " & SUM(N2:AB2) & " = " & M2, "MISMATCH: Sum " & SUM(N2:AB2) & " ≠ " & M2))
+
+// DETAILED VERSION - IGNORE MISMATCHES WHEN SUM IS 0: Only shows mismatches if sum > 0
+=IF(SUMPRODUCT(--(REGEXMATCH(N2:AB2&"", "(?i)not specified")))>0, "ERROR: Contains 'Not Specified' | Sum: " & SUM(N2:AB2), IF(SUM(N2:AB2)=M2, "MATCH: Sum " & SUM(N2:AB2) & " = " & M2, IF(SUM(N2:AB2)=0, "", "MISMATCH: Sum " & SUM(N2:AB2) & " ≠ " & M2)))
+
+// FINAL VERSION - ONLY SHOW MISMATCH IF SUM > 0 AND DIFFERENCE > 5%: Shows mismatches only for significant differences
+=IF(SUMPRODUCT(--(REGEXMATCH(N2:AB2&"", "(?i)not specified")))>0, "ERROR: Contains 'Not Specified' | Sum: " & SUM(N2:AB2), IF(SUM(N2:AB2)=M2, "MATCH: Sum " & SUM(N2:AB2) & " = " & M2, IF(OR(SUM(N2:AB2)=0, AND(M2<>0, ABS(SUM(N2:AB2)-M2)/M2<=0.05)), "", "MISMATCH: Sum " & SUM(N2:AB2) & " ≠ " & M2 & " (" & ROUND(ABS(SUM(N2:AB2)-M2)/M2*100,1) & "% diff)")))
