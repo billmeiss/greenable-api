@@ -8,6 +8,7 @@ import axios from 'axios';
 import { readFile } from 'fs/promises';
 import { GeminiAiService } from './gemini-ai.service';
 import { SearchService } from './search.service';
+import { EmissionsReportService } from './emissions-report.service';
 
 // Add type definition for Gemini API response
 interface GeminiResponse {
@@ -63,6 +64,7 @@ export class CompanyService {
     private readonly googleAuthService: GoogleAuthService,
     private readonly sheetsApiService: SheetsApiService,
     private readonly searchService: SearchService,
+    private readonly emissionsReportService: EmissionsReportService,
   ) {}
 
   /**
@@ -1645,5 +1647,46 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       console.log(`[ERROR] Error updating scope3 for ${company}: ${error.message}`);
       return false;
     }
+  }
+
+  async getEmissionsFromReport(company: string, reportUrl: string, emissionValues: any): Promise<any> {
+    const report = await this.emissionsReportService.getScopedEmissionsFromReport(reportUrl, emissionValues);
+    // Cross reference the report with the emission values
+    const emissions = report.emissions;
+    const isScope1Correct = emissions.scope1 === emissionValues.scope1;
+    const isScope2LocationCorrect = emissions.scope2Location === emissionValues.scope2Location;
+    const isScope2MarketCorrect = emissions.scope2Market === emissionValues.scope2Market;
+    const isScope3Correct = emissions.scope3 === emissionValues.scope3;
+    const isScope3Cat1Correct = emissions.scope3Cat1 === emissionValues.scope3Cat1;
+    const isScope3Cat2Correct = emissions.scope3Cat2 === emissionValues.scope3Cat2;
+    const isScope3Cat3Correct = emissions.scope3Cat3 === emissionValues.scope3Cat3;
+    const isScope3Cat4Correct = emissions.scope3Cat4 === emissionValues.scope3Cat4;
+    const isScope3Cat5Correct = emissions.scope3Cat5 === emissionValues.scope3Cat5;
+    const isScope3Cat6Correct = emissions.scope3Cat6 === emissionValues.scope3Cat6;
+    const isScope3Cat7Correct = emissions.scope3Cat7 === emissionValues.scope3Cat7;
+    const isScope3Cat8Correct = emissions.scope3Cat8 === emissionValues.scope3Cat8;
+    const isScope3Cat9Correct = emissions.scope3Cat9 === emissionValues.scope3Cat9;
+    const isScope3Cat10Correct = emissions.scope3Cat10 === emissionValues.scope3Cat10;
+    const isScope3Cat11Correct = emissions.scope3Cat11 === emissionValues.scope3Cat11;
+    const isScope3Cat12Correct = emissions.scope3Cat12 === emissionValues.scope3Cat12;
+    const isScope3Cat13Correct = emissions.scope3Cat13 === emissionValues.scope3Cat13;
+    const isScope3Cat14Correct = emissions.scope3Cat14 === emissionValues.scope3Cat14;
+    const isScope3Cat15Correct = emissions.scope3Cat15 === emissionValues.scope3Cat15;
+
+    const data = await this.sheetsApiService.getValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!A2:E`
+    );
+    const rows = data.values || [];
+    const companyIndex = rows.findIndex(row => row[0] === company);
+
+    // Add checks to sheet
+    await this.sheetsApiService.updateValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!AV${companyIndex + 2}`,
+      [[!isScope1Correct ? emissionValues.scope1 : '', !isScope2LocationCorrect ? emissionValues.scope2Location : '', !isScope2MarketCorrect ? emissionValues.scope2Market : '', !isScope3Correct ? emissionValues.scope3 : '', !isScope3Cat1Correct ? emissionValues.scope3Cat1 : '', !isScope3Cat2Correct ? emissionValues.scope3Cat2 : '', !isScope3Cat3Correct ? emissionValues.scope3Cat3 : '', !isScope3Cat4Correct ? emissionValues.scope3Cat4 : '', !isScope3Cat5Correct ? emissionValues.scope3Cat5 : '', !isScope3Cat6Correct ? emissionValues.scope3Cat6 : '', !isScope3Cat7Correct ? emissionValues.scope3Cat7 : '', !isScope3Cat8Correct ? emissionValues.scope3Cat8 : '', !isScope3Cat9Correct ? emissionValues.scope3Cat9 : '', !isScope3Cat10Correct ? emissionValues.scope3Cat10 : '', !isScope3Cat11Correct ? emissionValues.scope3Cat11 : '', !isScope3Cat12Correct ? emissionValues.scope3Cat12 : '', !isScope3Cat13Correct ? emissionValues.scope3Cat13 : '', !isScope3Cat14Correct ? emissionValues.scope3Cat14 : '', !isScope3Cat15Correct ? emissionValues.scope3Cat15 : '']]
+    );
+
+    return { isScope1Correct, isScope2LocationCorrect, isScope2MarketCorrect, isScope3Correct, isScope3Cat1Correct, isScope3Cat2Correct, isScope3Cat3Correct, isScope3Cat4Correct, isScope3Cat5Correct, isScope3Cat6Correct, isScope3Cat7Correct, isScope3Cat8Correct, isScope3Cat9Correct, isScope3Cat10Correct, isScope3Cat11Correct, isScope3Cat12Correct, isScope3Cat13Correct, isScope3Cat14Correct, isScope3Cat15Correct };
   }
 }

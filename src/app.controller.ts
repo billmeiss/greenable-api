@@ -64,5 +64,10 @@ export class AppController {
   @Post('/check-incomplete-revenues')
   checkIncompleteRevenues() {
     return this.appService.checkIncompleteRevenues();
+  }  
+
+  @Post('/check-existing-reports')
+  checkExistingReports() {
+    return this.appService.checkExistingReports();
   }
 }

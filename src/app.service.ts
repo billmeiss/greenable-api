@@ -278,9 +278,20 @@ export class AppService {
         await this.companyService.updateScope3(name, scope3Values.reason, scope3Values?.scope3Values);
       }
       } catch (error) {
-        console.log(`[ERROR] Failed to check incomplete revenues for ${name}: ${error.message}`);
+        console.log(`[ERROR] Failed to check incomplete revenues: ${error.message}`);
         continue;
       }
+    }
+  }
+
+  async checkExistingReports(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    for (const company of companies) {
+      const { name, reportUrl, scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 } = company;
+      // Async get emissions from the report  
+      const emissionValues = { scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 };
+      const report = await this.companyService.getEmissionsFromReport(name, reportUrl, emissionValues);
+      console.log(report);
     }
   }
 }
