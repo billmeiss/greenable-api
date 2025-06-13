@@ -274,7 +274,7 @@ export class AppService {
 
       console.log(scope3Values);
       if (!scope3Values.isCorrect) {
-        await this.companyService.updateScope3(name, scope3Values);
+        await this.companyService.updateScope3(name, scope3Values.reason, scope3Values?.scope3Values);
       }
     }
   }

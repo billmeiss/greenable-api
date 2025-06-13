@@ -1604,7 +1604,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     return parsedResponse;
   }
 
-  async updateScope3(company: string, {scope3Values}: any, reason: string): Promise<boolean> {
+  async updateScope3(company: string, reason: string, scope3Values: any): Promise<boolean> {
     try {
       console.log(`[STEP] Updating scope3 for ${company} in 'Analysed Data' sheet`);
       const data = await this.sheetsApiService.getValues(
