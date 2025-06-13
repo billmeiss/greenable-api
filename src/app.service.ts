@@ -271,6 +271,8 @@ export class AppService {
         scope3Cat14,
         scope3Cat15,
       });
+
+      console.log(scope3Values);
       if (!scope3Values.isCorrect) {
         await this.companyService.updateScope3(name, scope3Values);
       }

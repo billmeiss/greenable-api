@@ -1544,7 +1544,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   async checkMismatchedScope3(company: string, reportUrl: string, scope3Values): Promise<any> {
     // Call Gemini to check if the scope3 values are correct
-    return await this.geminiAiService.processUrl(reportUrl, 
+    const response = await this.geminiAiService.processUrl(reportUrl, 
       `
         You are a helpful assistant that checks if the scope3 values are correct.
         Look for tables, charts, and text that explicitly mention greenhouse gas emissions.
@@ -1571,6 +1571,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         The exisitng scope3 values are: ${JSON.stringify(scope3Values)}
         Make sure to gather new values from the report, and ignore the existing values when scanning the report..
         The report url is: ${reportUrl}
+        If a category is part of the scope 3 total but their absolute value is not provided, set the value to Not Specified.
+        If a category is not part of the scope 3 total, set the value to null.
         Please check each individual scope 3 value and the sum, since I've already determined that there's a mismatch. Make sure the total sum was not hallucinated or that the individual scope 3 categories were not extracted incorrectly.
         Your response should be a JSON object with the following fields:
         {
@@ -1597,9 +1599,12 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         }
       `, 
     )
+
+    const parsedResponse = this.geminiApiService.safelyParseJson(response);
+    return parsedResponse;
   }
 
-  async updateScope3(company: string, scope3Values: any): Promise<boolean> {
+  async updateScope3(company: string, {scope3Values}: any, reason: string): Promise<boolean> {
     try {
       console.log(`[STEP] Updating scope3 for ${company} in 'Analysed Data' sheet`);
       const data = await this.sheetsApiService.getValues(
@@ -1615,10 +1620,17 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         return false;
       }
 
+      if (!scope3Values) {
+        console.log(`[ERROR] Scope3 values are not provided for ${company}`);
+        return false;
+      }
+
+      console.log(scope3Values, companyIndex);
+
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
         `Analysed Data!AS${companyIndex + 2}`,
-        [[scope3Values.scope3Values.scope3Total, scope3Values.scope3Values.scope3Cat1, scope3Values.scope3Values.scope3Cat2, scope3Values.scope3Values.scope3Cat3, scope3Values.scope3Values.scope3Cat4, scope3Values.scope3Values.scope3Cat5, scope3Values.scope3Values.scope3Cat6, scope3Values.scope3Values.scope3Cat7, scope3Values.scope3Values.scope3Cat8, scope3Values.scope3Values.scope3Cat9, scope3Values.scope3Values.scope3Cat10, scope3Values.scope3Values.scope3Cat11, scope3Values.scope3Values.scope3Cat12, scope3Values.scope3Values.scope3Cat13, scope3Values.scope3Values.scope3Cat14, scope3Values.scope3Values.scope3Cat15]]
+        [[reason, scope3Values.scope3Total, scope3Values.scope3Cat1, scope3Values.scope3Cat2, scope3Values.scope3Cat3, scope3Values.scope3Cat4, scope3Values.scope3Cat5, scope3Values.scope3Cat6, scope3Values.scope3Cat7, scope3Values.scope3Cat8, scope3Values.scope3Cat9, scope3Values.scope3Cat10, scope3Values.scope3Cat11, scope3Values.scope3Cat12, scope3Values.scope3Cat13, scope3Values.scope3Cat14, scope3Values.scope3Cat15]]
       );
 
       console.log(`[RESULT] Successfully updated scope3 for ${company} in 'Analysed Data' sheet`);

@@ -31,7 +31,7 @@ export class ReportFinderService {
   async searchForESGReports(company: string, targetYear: number, isHistorical = false): Promise<any[]> {
     const yearStr = targetYear.toString();
 
-    const searchQuery = `intext:${company} ${company} ${yearStr} sustainability esg report fact sheet pdf`;
+    const searchQuery = `intext:${company} intext:emissions ${company} ${yearStr} sustainability esg report fact sheet pdf`;
     const searchResults = await this.searchService.performWebSearch(searchQuery);
     
     // Remove duplicates based on link
