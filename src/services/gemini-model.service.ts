@@ -308,11 +308,26 @@ Extra-territorial organizations and bodies
 
     }
 
+    this.modelConfigs.googleESGReportFinder = {
+      model: 'gemini-2.5-pro-preview-06-05',
+      generationConfig: {
+        temperature: 0.1,
+        tools: [{googleSearch: {}}],
+      },
+      systemInstruction: `You will return responses in this JSON format:
+            {
+              "link": "The URL of the ESG report",
+              "title": "The title of the ESG report",
+              "snippet": "The snippet of the ESG report",
+            }`
+    }
+
     // Direct report finder model
     this.modelConfigs.directReportFinder = {
-      model: 'gemini-2.5-flash-preview-05-20',
+      model: 'gemini-2.5-pro-preview-06-05',
       generationConfig: {
         responseMimeType: 'application/json',
+        temperature: 0.1,
       },
       systemInstruction: `You will return responses in this JSON format:
             {

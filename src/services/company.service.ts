@@ -1630,7 +1630,13 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
         `Analysed Data!AS${companyIndex + 2}`,
-        [[reason, scope3Values.scope3Total, scope3Values.scope3Cat1, scope3Values.scope3Cat2, scope3Values.scope3Cat3, scope3Values.scope3Cat4, scope3Values.scope3Cat5, scope3Values.scope3Cat6, scope3Values.scope3Cat7, scope3Values.scope3Cat8, scope3Values.scope3Cat9, scope3Values.scope3Cat10, scope3Values.scope3Cat11, scope3Values.scope3Cat12, scope3Values.scope3Cat13, scope3Values.scope3Cat14, scope3Values.scope3Cat15]]
+        [[reason]]
+      );
+
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!M${companyIndex + 2}`,
+        [[scope3Values.scope3Total, scope3Values.scope3Cat1, scope3Values.scope3Cat2, scope3Values.scope3Cat3, scope3Values.scope3Cat4, scope3Values.scope3Cat5, scope3Values.scope3Cat6, scope3Values.scope3Cat7, scope3Values.scope3Cat8, scope3Values.scope3Cat9, scope3Values.scope3Cat10, scope3Values.scope3Cat11, scope3Values.scope3Cat12, scope3Values.scope3Cat13, scope3Values.scope3Cat14, scope3Values.scope3Cat15]]
       );
 
       console.log(`[RESULT] Successfully updated scope3 for ${company} in 'Analysed Data' sheet`);
