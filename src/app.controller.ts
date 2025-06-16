@@ -61,9 +61,9 @@ export class AppController {
     return this.appService.updateInconsistentRevenues();
   }
 
-  @Post('/check-incomplete-revenues')
-  checkIncompleteRevenues() {
-    return this.appService.checkIncompleteRevenues();
+  @Post('/check-incomplete-scopes')
+  checkIncompleteScopes() {
+    return this.appService.checkIncompleteScopes();
   }  
 
   @Post('/check-existing-reports')

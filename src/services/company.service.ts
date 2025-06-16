@@ -1650,28 +1650,28 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   async getEmissionsFromReport(company: string, reportUrl: string, emissionValues: any): Promise<any> {
-    const report = await this.emissionsReportService.getScopedEmissionsFromReport(reportUrl, emissionValues);
+    const emissions = await this.emissionsReportService.getScopedEmissionsFromReport(reportUrl, company);
+    console.log(emissions);
     // Cross reference the report with the emission values
-    const emissions = report.emissions;
-    const isScope1Correct = emissions.scope1 === emissionValues.scope1;
-    const isScope2LocationCorrect = emissions.scope2Location === emissionValues.scope2Location;
-    const isScope2MarketCorrect = emissions.scope2Market === emissionValues.scope2Market;
-    const isScope3Correct = emissions.scope3 === emissionValues.scope3;
-    const isScope3Cat1Correct = emissions.scope3Cat1 === emissionValues.scope3Cat1;
-    const isScope3Cat2Correct = emissions.scope3Cat2 === emissionValues.scope3Cat2;
-    const isScope3Cat3Correct = emissions.scope3Cat3 === emissionValues.scope3Cat3;
-    const isScope3Cat4Correct = emissions.scope3Cat4 === emissionValues.scope3Cat4;
-    const isScope3Cat5Correct = emissions.scope3Cat5 === emissionValues.scope3Cat5;
-    const isScope3Cat6Correct = emissions.scope3Cat6 === emissionValues.scope3Cat6;
-    const isScope3Cat7Correct = emissions.scope3Cat7 === emissionValues.scope3Cat7;
-    const isScope3Cat8Correct = emissions.scope3Cat8 === emissionValues.scope3Cat8;
-    const isScope3Cat9Correct = emissions.scope3Cat9 === emissionValues.scope3Cat9;
-    const isScope3Cat10Correct = emissions.scope3Cat10 === emissionValues.scope3Cat10;
-    const isScope3Cat11Correct = emissions.scope3Cat11 === emissionValues.scope3Cat11;
-    const isScope3Cat12Correct = emissions.scope3Cat12 === emissionValues.scope3Cat12;
-    const isScope3Cat13Correct = emissions.scope3Cat13 === emissionValues.scope3Cat13;
-    const isScope3Cat14Correct = emissions.scope3Cat14 === emissionValues.scope3Cat14;
-    const isScope3Cat15Correct = emissions.scope3Cat15 === emissionValues.scope3Cat15;
+    const isScope1Correct = emissions.scope1?.value === parseInt(emissionValues.scope1);
+    const isScope2LocationCorrect = emissions.scope2?.locationBased?.value === parseInt(emissionValues.scope2Location);
+    const isScope2MarketCorrect = emissions.scope2?.marketBased?.value === parseInt(emissionValues.scope2Market);
+    const isScope3Correct = emissions.scope3?.total?.value === parseInt(emissionValues.scope3);
+    const isScope3Cat1Correct = emissions.scope3?.categories['1']?.value === parseInt(emissionValues.scope3Cat1);
+    const isScope3Cat2Correct = emissions.scope3?.categories['2']?.value === parseInt(emissionValues.scope3Cat2);
+    const isScope3Cat3Correct = emissions.scope3?.categories['3']?.value === parseInt(emissionValues.scope3Cat3);
+    const isScope3Cat4Correct = emissions.scope3?.categories['4']?.value === parseInt(emissionValues.scope3Cat4);
+    const isScope3Cat5Correct = emissions.scope3?.categories['5']?.value === parseInt(emissionValues.scope3Cat5);
+    const isScope3Cat6Correct = emissions.scope3?.categories['6']?.value === parseInt(emissionValues.scope3Cat6);
+    const isScope3Cat7Correct = emissions.scope3?.categories['7']?.value === parseInt(emissionValues.scope3Cat7);
+    const isScope3Cat8Correct = emissions.scope3?.categories['8']?.value === parseInt(emissionValues.scope3Cat8);
+    const isScope3Cat9Correct = emissions.scope3?.categories['9']?.value === parseInt(emissionValues.scope3Cat9);
+    const isScope3Cat10Correct = emissions.scope3?.categories['10']?.value === parseInt(emissionValues.scope3Cat10);
+    const isScope3Cat11Correct = emissions.scope3?.categories['11']?.value === parseInt(emissionValues.scope3Cat11);
+    const isScope3Cat12Correct = emissions.scope3?.categories['12']?.value === parseInt(emissionValues.scope3Cat12);
+    const isScope3Cat13Correct = emissions.scope3?.categories['13']?.value === parseInt(emissionValues.scope3Cat13);
+    const isScope3Cat14Correct = emissions.scope3?.categories['14']?.value === parseInt(emissionValues.scope3Cat14);
+    const isScope3Cat15Correct = emissions.scope3?.categories['15']?.value === parseInt(emissionValues.scope3Cat15);
 
     const data = await this.sheetsApiService.getValues(
       this.SPREADSHEET_ID,

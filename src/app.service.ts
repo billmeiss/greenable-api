@@ -246,8 +246,8 @@ export class AppService {
     }
   }
 
-  async checkIncompleteRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet();
+  async checkIncompleteScopes(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 700 });
     for (const company of companies) {
       try {
       const { name, reportUrl, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15, scope3Mismatch } = company;
@@ -286,6 +286,7 @@ export class AppService {
 
   async checkExistingReports(): Promise<any> {
     const companies = await this.companyService.getExistingCompaniesFromSheet();
+    try {
     for (const company of companies) {
       const { name, reportUrl, scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 } = company;
       // Async get emissions from the report  
@@ -293,6 +294,9 @@ export class AppService {
       const report = await this.companyService.getEmissionsFromReport(name, reportUrl, emissionValues);
       console.log(report);
     }
+  } catch (error) {
+    console.log(`[ERROR] Failed to check existing reports: ${error.message}`);
+  }
   }
 }
 
