@@ -21,6 +21,41 @@ export class EmissionsReportService {
     private readonly searchService: SearchService,
   ) {}
 
+  async checkExistingEmissions(company: string, reportUrl: string, emissions: any): Promise<any> {
+    console.log(`[STEP] Checking existing emissions for ${company}: ${reportUrl}`);
+    console.log(`[DETAIL] Emissions: ${emissions}`);
+
+    // Prompt to check if the emissions are extreacted correctly
+    const checkPrompt = `
+      Check if the emissions are extreacted correctly.
+      If the emissions are not extreacted correctly, return what emissions are incorrect.
+      If the emissions are extreacted correctly, return the emissions.
+
+      The existing emissions are:
+      ${Object.keys(emissions).map(key => `${key}: ${emissions[key]}`).join('\n')}
+
+      If all the emissions are correct, return null
+
+      Return the following structure:
+      {
+        "incorrectEmissions": [
+          {
+            "scope": string,
+            "value": number,
+            "unit": string,
+            "confidence": number (0-10)
+          },
+        ]
+      }
+    `;
+
+    const result = await this.geminiApiService.handleGeminiCall(
+      () => this.geminiAiService.processUrl(reportUrl, checkPrompt), 2, 1000, 10 * 60 * 1000
+    );
+
+    console.log(result);
+  }
+
   /**
    * Get scoped emissions data from a company report
    */
@@ -34,6 +69,7 @@ export class EmissionsReportService {
 
         If the company has a portfolio of other companies, you must extract the emissions data for each company in the portfolio and return those emissions under the field "portfolioCompanies".
         Only return portfolio companies for companies that are investment holding, or financial companies.
+        If a company has portfolio companies, make sure you still return the main company's / group's emissions data.
 
         If a value is only provided for Scope 1&2 total, you must check if Scope 1 is included in the calculations.
         If a value is only provided for Scope 1&2 total, you must check if Scope 2 is included in the calculations.

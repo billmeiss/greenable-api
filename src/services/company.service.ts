@@ -432,10 +432,11 @@ export class CompanyService {
       this.logger.log(`No revenue data found in FMP for ${companyName}, using Gemini fallback`);
             
       // Create user prompt with company and period information
-      let userPrompt = `I need accurate financial information about ${companyName}${reportingPeriod ? ' specifically for the same period as their emissions report: ' + reportingPeriod : ' for the most recent period'}.${targetYear !== 'recent' ? ' Please focus on finding revenue data for the year ' + targetYear + '.' : ''}${reportingPeriod ? ' IMPORTANT: Please prioritize finding revenue data that matches the reporting period ' + reportingPeriod + ' to ensure data consistency with the emissions report.' : ''}`;
+      const originalUserPrompt = `I need accurate financial information about ${companyName}${reportingPeriod ? ' specifically for the same period as their emissions report: ' + reportingPeriod : ' for the most recent period'}.${targetYear !== 'recent' ? ' Please focus on finding revenue data for the year ' + targetYear + '.' : ''}${reportingPeriod ? ' IMPORTANT: Please prioritize finding revenue data that matches the reporting period ' + reportingPeriod + ' to ensure data consistency with the emissions report.' : ''}`;
+      let userPrompt = originalUserPrompt;
 
       
-      let result;
+      let result: RevenueData | null = null;
 
       // Check if the company has an annual report
       const annualReport = await this.searchForCompanyAnnualReport(companyName, targetYear);
@@ -446,6 +447,16 @@ export class CompanyService {
         const response = await this.geminiAiService.processUrl(annualReport, userPrompt, 'revenueFromAnnualReport');
         console.log(response);
         const parsedResponse = this.geminiApiService.safelyParseJson(response);
+        if (!parsedResponse.revenue) {
+          // Get Revenue directly from the model
+          const revenueModel = this.geminiModelService.getModel('revenue');
+          const response = await this.geminiApiService.handleGeminiCall(
+            () => revenueModel.generateContent({
+              contents: [{ role: 'user', parts: [{ text: originalUserPrompt }] }]
+            })
+          );
+          const parsedResponse = this.geminiApiService.safelyParseJson(response.text);
+        }
         result = {
           ...parsedResponse,
           source: 'Annual Report',
@@ -453,7 +464,20 @@ export class CompanyService {
           year: targetYear
         }
       } else {
-        return null;
+        // Get Revenue directly from the model
+        const revenueModel = this.geminiModelService.getModel('revenue');
+        const response = await this.geminiApiService.handleGeminiCall(
+          () => revenueModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: originalUserPrompt }] }]
+          })
+        );
+        const parsedResponse = this.geminiApiService.safelyParseJson(response.text);
+        result = {
+          ...parsedResponse,
+          source: 'Gemini Model',
+          sourceUrl: null,
+          currency: 'USD'
+        }
       }
       
       if (!result || !result) {
@@ -1278,7 +1302,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Update the cell with the new revenue data and year
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AN${companyIndex + 2}`,
+        `Analysed Data!F${companyIndex + 2}`,
         [[revenueData.revenue, revenueData.currency]]
       );
 
@@ -1649,29 +1673,41 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
   }
 
+  private normalizeValueForComparison(value: any): any {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') {
+      // Handle special string cases
+      if (value.toLowerCase() === 'not specified but included in calculation') return value;
+      // Try to convert string numbers to actual numbers
+      const num = Number(value);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  }
+
   async getEmissionsFromReport(company: string, reportUrl: string, emissionValues: any): Promise<any> {
     const emissions = await this.emissionsReportService.getScopedEmissionsFromReport(reportUrl, company);
     console.log(emissions);
     // Cross reference the report with the emission values
-    const isScope1Correct = emissions.scope1?.value === parseInt(emissionValues.scope1);
-    const isScope2LocationCorrect = emissions.scope2?.locationBased?.value === parseInt(emissionValues.scope2Location);
-    const isScope2MarketCorrect = emissions.scope2?.marketBased?.value === parseInt(emissionValues.scope2Market);
-    const isScope3Correct = emissions.scope3?.total?.value === parseInt(emissionValues.scope3);
-    const isScope3Cat1Correct = emissions.scope3?.categories['1']?.value === parseInt(emissionValues.scope3Cat1);
-    const isScope3Cat2Correct = emissions.scope3?.categories['2']?.value === parseInt(emissionValues.scope3Cat2);
-    const isScope3Cat3Correct = emissions.scope3?.categories['3']?.value === parseInt(emissionValues.scope3Cat3);
-    const isScope3Cat4Correct = emissions.scope3?.categories['4']?.value === parseInt(emissionValues.scope3Cat4);
-    const isScope3Cat5Correct = emissions.scope3?.categories['5']?.value === parseInt(emissionValues.scope3Cat5);
-    const isScope3Cat6Correct = emissions.scope3?.categories['6']?.value === parseInt(emissionValues.scope3Cat6);
-    const isScope3Cat7Correct = emissions.scope3?.categories['7']?.value === parseInt(emissionValues.scope3Cat7);
-    const isScope3Cat8Correct = emissions.scope3?.categories['8']?.value === parseInt(emissionValues.scope3Cat8);
-    const isScope3Cat9Correct = emissions.scope3?.categories['9']?.value === parseInt(emissionValues.scope3Cat9);
-    const isScope3Cat10Correct = emissions.scope3?.categories['10']?.value === parseInt(emissionValues.scope3Cat10);
-    const isScope3Cat11Correct = emissions.scope3?.categories['11']?.value === parseInt(emissionValues.scope3Cat11);
-    const isScope3Cat12Correct = emissions.scope3?.categories['12']?.value === parseInt(emissionValues.scope3Cat12);
-    const isScope3Cat13Correct = emissions.scope3?.categories['13']?.value === parseInt(emissionValues.scope3Cat13);
-    const isScope3Cat14Correct = emissions.scope3?.categories['14']?.value === parseInt(emissionValues.scope3Cat14);
-    const isScope3Cat15Correct = emissions.scope3?.categories['15']?.value === parseInt(emissionValues.scope3Cat15);
+    const isScope1Correct = this.normalizeValueForComparison(emissions.scope1?.value) === this.normalizeValueForComparison(emissionValues.scope1);
+    const isScope2LocationCorrect = this.normalizeValueForComparison(emissions.scope2?.locationBased?.value) === this.normalizeValueForComparison(emissionValues.scope2Location);
+    const isScope2MarketCorrect = this.normalizeValueForComparison(emissions.scope2?.marketBased?.value) === this.normalizeValueForComparison(emissionValues.scope2Market);
+    const isScope3Correct = this.normalizeValueForComparison(emissions.scope3?.total?.value) === this.normalizeValueForComparison(emissionValues.scope3);
+    const isScope3Cat1Correct = this.normalizeValueForComparison(emissions.scope3?.categories['1']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat1);
+    const isScope3Cat2Correct = this.normalizeValueForComparison(emissions.scope3?.categories['2']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat2);
+    const isScope3Cat3Correct = this.normalizeValueForComparison(emissions.scope3?.categories['3']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat3);
+    const isScope3Cat4Correct = this.normalizeValueForComparison(emissions.scope3?.categories['4']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat4);
+    const isScope3Cat5Correct = this.normalizeValueForComparison(emissions.scope3?.categories['5']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat5);
+    const isScope3Cat6Correct = this.normalizeValueForComparison(emissions.scope3?.categories['6']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat6);
+    const isScope3Cat7Correct = this.normalizeValueForComparison(emissions.scope3?.categories['7']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat7);
+    const isScope3Cat8Correct = this.normalizeValueForComparison(emissions.scope3?.categories['8']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat8);
+    const isScope3Cat9Correct = this.normalizeValueForComparison(emissions.scope3?.categories['9']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat9);
+    const isScope3Cat10Correct = this.normalizeValueForComparison(emissions.scope3?.categories['10']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat10);
+    const isScope3Cat11Correct = this.normalizeValueForComparison(emissions.scope3?.categories['11']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat11);
+    const isScope3Cat12Correct = this.normalizeValueForComparison(emissions.scope3?.categories['12']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat12);
+    const isScope3Cat13Correct = this.normalizeValueForComparison(emissions.scope3?.categories['13']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat13);
+    const isScope3Cat14Correct = this.normalizeValueForComparison(emissions.scope3?.categories['14']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat14);
+    const isScope3Cat15Correct = this.normalizeValueForComparison(emissions.scope3?.categories['15']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat15);
 
     const data = await this.sheetsApiService.getValues(
       this.SPREADSHEET_ID,

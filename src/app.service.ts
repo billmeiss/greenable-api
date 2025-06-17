@@ -57,7 +57,7 @@ export class AppService {
   }
 
   async updateExchangeRatesForCompanies(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5250 });
     // If exchange rate is not USD, convert the revenue to USD
     for (const company of companies) {
       const { name, reportingPeriod, revenue, revenueYear, exchangeRateCountry } = company;
@@ -181,14 +181,13 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5250 });
     for (const company of companies) {
-      const { name, reportingPeriod, revenueYear, revenueUrl, newRevenueUrl, country, newRevenueCurrency, newRevenueAmount } = company;
-      if (!newRevenueUrl) continue;
-      if (newRevenueAmount && newRevenueCurrency !== 'USD') {
-        const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, newRevenueCurrency);
+      const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, newRevenueUrl, country, newRevenueCurrency, newRevenueAmount } = company;
+      if (revenueAmount && exchangeRateCountry !== 'USD') {
+        const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
         if (exchangeRate) {
-          const updatedRevenue = newRevenueAmount / exchangeRate;
+          const updatedRevenue = revenueAmount / exchangeRate;
           await this.companyService.updateNewRevenue(name, {
             revenue: updatedRevenue,
             currency: 'USD'
@@ -200,19 +199,18 @@ export class AppService {
       if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
         continue;
       }
-      console.log(newRevenueUrl);
-      // If the new revenue url is not an error, continu
-      if (newRevenueAmount > 0 && !newRevenueUrl?.includes('Error')) {
-        continue;
+
+      if (revenueAmount) {
+              // Check if the existing revenue source returns a 404
+      try {
+        const response = await axios.get(revenueUrl);
+        if (response.status === 200) continue;
+      } catch (error) {
+        console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
+      }
       }
 
-      // // Check if the existing revenue source returns a 404
-      // try {
-      //   const response = await axios.get(revenueUrl);
-      //   if (response.status === 200) continue;
-      // } catch (error) {
-      //   console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
-      // }
+
       // Update the revenue source to the annual report
       const revenue = await this.companyService.getCompanyRevenue(name, revenueYear);
       console.log(revenue);
@@ -247,7 +245,7 @@ export class AppService {
   }
 
   async checkIncompleteScopes(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 700 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5371 });
     for (const company of companies) {
       try {
       const { name, reportUrl, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15, scope3Mismatch } = company;
@@ -291,7 +289,7 @@ export class AppService {
       const { name, reportUrl, scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 } = company;
       // Async get emissions from the report  
       const emissionValues = { scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 };
-      const report = await this.companyService.getEmissionsFromReport(name, reportUrl, emissionValues);
+      const report = await this.emissionsReportService.checkExistingEmissions(name, reportUrl, emissionValues);
       console.log(report);
     }
   } catch (error) {
