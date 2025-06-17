@@ -1141,14 +1141,11 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Extract the third party assurance data
       const thirdPartyAssurance = emissions.thirdPartyAssurance || {};
       const thirdPartyAssuranceCompany = thirdPartyAssurance.company || null;
-      const thirdPartyAssuranceNotes = thirdPartyAssurance.notes || null;
-      console.log(`[DETAIL] Third party assurance: ${thirdPartyAssuranceCompany || 'Not available'}, Notes: ${thirdPartyAssuranceNotes || 'N/A'}`);
       
       // Prepare scope 1 emissions
       const scope1 = emissions.scope1 || {};
       const scope1Value = scope1.value || (scope1.included ? 'Not specified but included in calculation' : null);
       const scope1Confidence = scope1.confidence || null;
-      const scope1Notes = scope1.notes || '';
       const scope1Unit = scope1.unit || emissionsUnit;
       console.log(`[DETAIL] Scope 1: ${scope1Value || 'Not available'} ${scope1Unit}, Confidence: ${scope1Confidence || 'N/A'}`);
       
@@ -1158,7 +1155,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const scope2MarketBased = scope2.marketBased || {};
       const scope2LocationValue = scope2LocationBased.value || (scope2LocationBased.included && !scope2MarketBased.included ? 'Not specified but included in calculation' : null);
       const scope2MarketValue = scope2MarketBased.value || (scope2MarketBased.included ? 'Not specified but included in calculation' : null);
-      const scope2Notes = scope2.notes || '';
       const scope2LocationUnit = scope2LocationBased.unit || emissionsUnit;
       const scope2MarketUnit = scope2MarketBased.unit || emissionsUnit;
       console.log(`[DETAIL] Scope 2 (Location): ${scope2LocationValue || 'Not available'} ${scope2LocationUnit}`);
@@ -1176,7 +1172,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const scope3Categories = scope3.categories || {};
       const categoryValues = {};
       const categoryIncluded = {};
-      const categoryNotes = {};
       const categoryUnits = {};
       
       // Map each category (1-15) to its value, inclusion status, and notes
@@ -1184,7 +1179,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         const category = scope3Categories[i.toString()];
         categoryValues[`category${i}`] = category?.value || (category?.included ? 'Not specified but included in calculation' : null);
         categoryIncluded[`category${i}Included`] = category?.included || false;
-        categoryNotes[`category${i}Notes`] = category?.notes || '';
         categoryUnits[`category${i}Unit`] = category?.unit || emissionsUnit;
         
         if (category?.value) {
@@ -1195,7 +1189,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Get included and missing categories
       const includedCategories = scope3.includedCategories || [];
       const missingCategories = scope3.missingCategories || [];
-      const scope3Notes = scope3.notes || '';
       const scope3Confidence = scope3.confidence || null;
       console.log(`[DETAIL] Included categories: ${includedCategories.join(', ') || 'None'}`);
       console.log(`[DETAIL] Missing categories: ${missingCategories.join(', ') || 'None'}`);
@@ -1246,11 +1239,13 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         scope2MarketValue,
         scope3Value,
         ...Object.values(categoryValues),
-        revenueSource,
+        ,
         country,
         companyCategory,
         thirdPartyAssuranceCompany,
-        `Scope 1: ${scope1Notes} Scope 2: ${scope2Notes} Scope 3: ${scope3Notes} Third Party Assurance: ${thirdPartyAssuranceNotes}`
+        emissions.notes,
+        revenueSource,
+        revenueSourceUrl,
       ];
       
       // Add the data to the sheet using SheetsApiService for exponential backoff
@@ -1685,29 +1680,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     return value;
   }
 
-  async getEmissionsFromReport(company: string, reportUrl: string, emissionValues: any): Promise<any> {
-    const emissions = await this.emissionsReportService.getScopedEmissionsFromReport(reportUrl, company);
-    console.log(emissions);
+  async updateIncorrectEmissions(company: string, incorrectEmissions: any): Promise<any> {
     // Cross reference the report with the emission values
-    const isScope1Correct = this.normalizeValueForComparison(emissions.scope1?.value) === this.normalizeValueForComparison(emissionValues.scope1);
-    const isScope2LocationCorrect = this.normalizeValueForComparison(emissions.scope2?.locationBased?.value) === this.normalizeValueForComparison(emissionValues.scope2Location);
-    const isScope2MarketCorrect = this.normalizeValueForComparison(emissions.scope2?.marketBased?.value) === this.normalizeValueForComparison(emissionValues.scope2Market);
-    const isScope3Correct = this.normalizeValueForComparison(emissions.scope3?.total?.value) === this.normalizeValueForComparison(emissionValues.scope3);
-    const isScope3Cat1Correct = this.normalizeValueForComparison(emissions.scope3?.categories['1']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat1);
-    const isScope3Cat2Correct = this.normalizeValueForComparison(emissions.scope3?.categories['2']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat2);
-    const isScope3Cat3Correct = this.normalizeValueForComparison(emissions.scope3?.categories['3']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat3);
-    const isScope3Cat4Correct = this.normalizeValueForComparison(emissions.scope3?.categories['4']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat4);
-    const isScope3Cat5Correct = this.normalizeValueForComparison(emissions.scope3?.categories['5']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat5);
-    const isScope3Cat6Correct = this.normalizeValueForComparison(emissions.scope3?.categories['6']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat6);
-    const isScope3Cat7Correct = this.normalizeValueForComparison(emissions.scope3?.categories['7']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat7);
-    const isScope3Cat8Correct = this.normalizeValueForComparison(emissions.scope3?.categories['8']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat8);
-    const isScope3Cat9Correct = this.normalizeValueForComparison(emissions.scope3?.categories['9']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat9);
-    const isScope3Cat10Correct = this.normalizeValueForComparison(emissions.scope3?.categories['10']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat10);
-    const isScope3Cat11Correct = this.normalizeValueForComparison(emissions.scope3?.categories['11']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat11);
-    const isScope3Cat12Correct = this.normalizeValueForComparison(emissions.scope3?.categories['12']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat12);
-    const isScope3Cat13Correct = this.normalizeValueForComparison(emissions.scope3?.categories['13']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat13);
-    const isScope3Cat14Correct = this.normalizeValueForComparison(emissions.scope3?.categories['14']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat14);
-    const isScope3Cat15Correct = this.normalizeValueForComparison(emissions.scope3?.categories['15']?.value) === this.normalizeValueForComparison(emissionValues.scope3Cat15);
 
     const data = await this.sheetsApiService.getValues(
       this.SPREADSHEET_ID,
@@ -1716,13 +1690,19 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const rows = data.values || [];
     const companyIndex = rows.findIndex(row => row[0] === company);
 
-    // Add checks to sheet
-    await this.sheetsApiService.updateValues(
-      this.SPREADSHEET_ID,
-      `Analysed Data!AV${companyIndex + 2}`,
-      [[!isScope1Correct ? emissionValues.scope1 : '', !isScope2LocationCorrect ? emissionValues.scope2Location : '', !isScope2MarketCorrect ? emissionValues.scope2Market : '', !isScope3Correct ? emissionValues.scope3 : '', !isScope3Cat1Correct ? emissionValues.scope3Cat1 : '', !isScope3Cat2Correct ? emissionValues.scope3Cat2 : '', !isScope3Cat3Correct ? emissionValues.scope3Cat3 : '', !isScope3Cat4Correct ? emissionValues.scope3Cat4 : '', !isScope3Cat5Correct ? emissionValues.scope3Cat5 : '', !isScope3Cat6Correct ? emissionValues.scope3Cat6 : '', !isScope3Cat7Correct ? emissionValues.scope3Cat7 : '', !isScope3Cat8Correct ? emissionValues.scope3Cat8 : '', !isScope3Cat9Correct ? emissionValues.scope3Cat9 : '', !isScope3Cat10Correct ? emissionValues.scope3Cat10 : '', !isScope3Cat11Correct ? emissionValues.scope3Cat11 : '', !isScope3Cat12Correct ? emissionValues.scope3Cat12 : '', !isScope3Cat13Correct ? emissionValues.scope3Cat13 : '', !isScope3Cat14Correct ? emissionValues.scope3Cat14 : '', !isScope3Cat15Correct ? emissionValues.scope3Cat15 : '']]
-    );
+    if (incorrectEmissions.length > 0) {
+      for (const incorrectEmission of incorrectEmissions) {
+        const { scope, value, correctValue, reason } = incorrectEmission;
+        if (scope === 'scope1') {
+          await this.sheetsApiService.updateValues(
+            this.SPREADSHEET_ID,
+            `Analysed Data!AU${companyIndex + 2}`,
+            [[`${scope}: ${value} -> ${correctValue} ------ (${reason})`]]
+          );
+        }
+      }
+    }
 
-    return { isScope1Correct, isScope2LocationCorrect, isScope2MarketCorrect, isScope3Correct, isScope3Cat1Correct, isScope3Cat2Correct, isScope3Cat3Correct, isScope3Cat4Correct, isScope3Cat5Correct, isScope3Cat6Correct, isScope3Cat7Correct, isScope3Cat8Correct, isScope3Cat9Correct, isScope3Cat10Correct, isScope3Cat11Correct, isScope3Cat12Correct, isScope3Cat13Correct, isScope3Cat14Correct, isScope3Cat15Correct };
+    return true;
   }
 }

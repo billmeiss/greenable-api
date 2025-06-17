@@ -25,6 +25,8 @@ export class EmissionsReportService {
     console.log(`[STEP] Checking existing emissions for ${company}: ${reportUrl}`);
     console.log(`[DETAIL] Emissions: ${emissions}`);
 
+    console.log(Object.keys(emissions).map(key => `${key}: ${emissions[key]}`).join('\n'));
+
     // Prompt to check if the emissions are extreacted correctly
     const checkPrompt = `
       Check if the emissions are extreacted correctly.
@@ -35,11 +37,17 @@ export class EmissionsReportService {
       ${Object.keys(emissions).map(key => `${key}: ${emissions[key]}`).join('\n')}
 
       If all the emissions are correct, return null
+      If an emission is incorrectly reported (only report numerical values -- Ignore not specified but included in calculation)
+      Ignore Scope 2 market based vs location based nuances.
+      Before stating scope 3 total is wrong make sure you added all the sub categories.
+      
 
       Return the following structure:
       {
-        "incorrectEmissions": [
+        "incorrectEmissions"?: Array<{
           {
+            "correctValue": number,
+            "reason": string,
             "scope": string,
             "value": number,
             "unit": string,
@@ -47,13 +55,46 @@ export class EmissionsReportService {
           },
         ]
       }
+
+      The instructions to help you extract the emissions are:
+      Focus on finding precise values for:
+        - Scope 1 emissions
+        - Scope 2 emissions (both location-based and market-based if available)
+        - Scope 3 emissions (total and breakdown by categories if available)
+        - Third party assurance (if available)
+      
+        
+        Look for tables, charts, and text that explicitly mention greenhouse gas emissions.
+        Ensure all values are converted to the same unit (preferably tons of CO2 equivalent).
+        Identify the reporting period for the emissions data.
+        
+        For scope 3 emissions, carefully analyze which categories (1-15) are reported:
+        1. Purchased goods and services
+        2. Capital goods
+        3. Fuel- and energy-related activities
+        4. Upstream transportation and distribution
+        5. Waste generated in operations
+        6. Business travel
+        7. Employee commuting
+        8. Upstream leased assets
+        9. Downstream transportation and distribution
+        10. Processing of sold products
+        11. Use of sold products
+        12. End-of-life treatment of sold products
+        13. Downstream leased assets
+        14. Franchises
+        15. Investments
+
+        You must convert all values to the standard unit of tons of CO2 equivalent.
     `;
 
     const result = await this.geminiApiService.handleGeminiCall(
       () => this.geminiAiService.processUrl(reportUrl, checkPrompt), 2, 1000, 10 * 60 * 1000
     );
 
-    console.log(result);
+    const parsedResult = this.geminiApiService.safelyParseJson(result);
+
+    return parsedResult?.incorrectEmissions;
   }
 
   /**
@@ -130,6 +171,7 @@ export class EmissionsReportService {
               "unit": "string",
               "confidence": number (0-10)
             },
+            "notes": "notes about the scope 1, 2, 3 total, and the categories and the third party assurance and anything relevant to note",
             "categories": {
               "1": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
                   "2": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
@@ -149,7 +191,6 @@ export class EmissionsReportService {
           },
           "thirdPartyAssurance": {
             "company": "string",
-            "notes": "string"
           },
           "portfolioCompanies": Array<{
             "reportingPeriod": "string - the reporting year or period (e.g., '2022' or 'FY 2021-2022')",
