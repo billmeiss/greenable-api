@@ -1690,16 +1690,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const rows = data.values || [];
     const companyIndex = rows.findIndex(row => row[0] === company);
 
-    if (incorrectEmissions.length > 0) {
+    if (incorrectEmissions && incorrectEmissions.length > 0) {
       for (const incorrectEmission of incorrectEmissions) {
         const { scope, value, correctValue, reason } = incorrectEmission;
-        if (scope === 'scope1') {
           await this.sheetsApiService.updateValues(
             this.SPREADSHEET_ID,
             `Analysed Data!AU${companyIndex + 2}`,
             [[`${scope}: ${value} -> ${correctValue} ------ (${reason})`]]
           );
-        }
       }
     }
 
