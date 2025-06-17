@@ -297,6 +297,7 @@ export class AppService {
         console.log(`[ERROR] Failed to check existing reports: ${error.message}`);
         continue;
       }
+    }
   }
 }
 
