@@ -37,7 +37,6 @@ export class EmissionsReportService {
       ${Object.keys(emissions).map(key => `${key}: ${emissions[key]}`).join('\n')}
 
       If all the emissions are correct, return null
-      If an emission is incorrectly reported (only report numerical values -- Ignore not specified but included in calculation)
       If there is an emission that is included in the caluclations but their value is not provided or disaggrageted, return 'Not specified but included in calculation'
 
       Working from home is part of Scope 3 Category 7.
