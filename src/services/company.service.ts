@@ -1702,4 +1702,19 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
     return true;
   }
+
+  async updateCompanyNotes(company: string, notes: string): Promise<any> {
+    const data = await this.sheetsApiService.getValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!A2:E`
+    );
+    const rows = data.values || [];
+    const companyIndex = rows.findIndex(row => row[0] === company);
+
+    await this.sheetsApiService.updateValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!AU${companyIndex + 2}`, 
+      [[`${notes}`]]
+    );
+  }
 }

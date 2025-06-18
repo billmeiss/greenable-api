@@ -283,7 +283,7 @@ export class AppService {
   }
 
   async checkExistingReports(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 258 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 462 });
     for (const company of companies) {
       try {
 
@@ -294,7 +294,8 @@ export class AppService {
       if (!report) continue;
       await this.companyService.updateIncorrectEmissions(name, report);
       } catch (error) {
-        console.log(`[ERROR] Failed to check existing reports: ${error.message}`);
+        console.log(`[ERROR] Failed to check existing reports: ${error.message} for ${name}`);
+        await this.companyService.updateCompanyNotes(company, `Error checking existing reports: ${error.message}`);
         continue;
       }
     }
