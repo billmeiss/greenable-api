@@ -47,6 +47,9 @@ export class EmissionsReportService {
       If you cannot read the report or are uncertain do not return anything.
 
       Also note that if there are no scope 1, or scope 2 emissions, then the scope 3 total represents the total emissions.
+
+      Scope 3 Total cannot be 'Not specified but included in calculation', it must be a total specified, or the sum of the sub categories if the total is not specified or the sum is higher than the total.
+      If you claim a category is not specified but included in the calculations, it MUST be included in the Scope 3 Total, otherwise it's null.
       
 
       Return the following structure:
