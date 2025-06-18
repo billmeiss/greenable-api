@@ -38,8 +38,15 @@ export class EmissionsReportService {
 
       If all the emissions are correct, return null
       If an emission is incorrectly reported (only report numerical values -- Ignore not specified but included in calculation)
+      If there is an emission that is included in the caluclations but their value is not provided or disaggrageted, return 'Not specified but included in calculation'
+
+      Working from home is part of Scope 3 Category 7.
       Ignore Scope 2 market based vs location based nuances.
-      Before stating scope 3 total is wrong make sure you added all the sub categories.
+      Before stating scope 3 total is wrong make sure you added all the sub categories. If the scope 3 sum is less than the total, return the total, otherwise ignore the total.
+
+      If you cannot read the report or are uncertain do not return anything.
+
+      Also note that if there are no scope 1, or scope 2 emissions, then the scope 3 total represents the total emissions.
       
 
       Return the following structure:

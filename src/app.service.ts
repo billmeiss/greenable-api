@@ -283,7 +283,7 @@ export class AppService {
   }
 
   async checkExistingReports(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 230 });
     for (const company of companies) {
       try {
 
