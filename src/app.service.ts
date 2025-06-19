@@ -283,21 +283,35 @@ export class AppService {
   }
 
   async checkExistingReports(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 527 });
-    for (const company of companies) {
-      try {
-
-      const { name, reportUrl, scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 } = company;
-      // Async get emissions from the report  
-      const emissionValues = { scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 };
-      const report = await this.emissionsReportService.checkExistingEmissions(name, reportUrl, emissionValues);
-      if (!report) continue;
-      await this.companyService.updateIncorrectEmissions(name, report);
-      } catch (error) {
-        console.log(`[ERROR] Failed to check existing reports: ${error.message} for ${company.name}`);
-        await this.companyService.updateCompanyNotes(company.name, `Error checking existing reports: ${error.message}`);
-        continue;
-      }
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 1349 });
+    
+    // Process companies in batches of 3
+    const batchSize = 3;
+    for (let i = 0; i < companies.length; i += batchSize) {
+      const batch = companies.slice(i, i + batchSize);
+      
+      // Process batch synchronously (all 3 companies in parallel)
+      const batchPromises = batch.map(async (company) => {
+        try {
+          const { name, reportUrl, scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 } = company;
+          
+          // Async get emissions from the report  
+          const emissionValues = { scope1, scope2Location, scope2Market, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15 };
+          const report = await this.emissionsReportService.checkExistingEmissions(name, reportUrl, emissionValues);
+          
+          if (report) {
+            await this.companyService.updateIncorrectEmissions(name, report);
+          }
+        } catch (error) {
+          console.log(`[ERROR] Failed to check existing reports: ${error.message} for ${company.name}`);
+          await this.companyService.updateCompanyNotes(company.name, `Error checking existing reports: ${error.message}`);
+        }
+      });
+      
+      // Wait for all companies in the current batch to complete
+      await Promise.all(batchPromises);
+      
+      this.logger.log(`Processed batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(companies.length / batchSize)} (companies ${i + 1}-${Math.min(i + batchSize, companies.length)})`);
     }
   }
 }
