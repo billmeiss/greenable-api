@@ -49,6 +49,9 @@ export class EmissionsReportService {
 
       Scope 3 Total cannot be 'Not specified but included in calculation', it must be a total specified, or the sum of the sub categories if the total is not specified or the sum is higher than the total.
       If you claim a category is not specified but included in the calculations, it MUST be included in the Scope 3 Total, otherwise it's null.
+
+      If you see only a value in scope 2 and scope 1 is 'Not specified but included in calculation' it means that is the combined value of scope 1 and scope 2.
+      If you see only a value in scope 3 and scope 1 and scope 2 are 'Not specified but included in calculation' it means that is the combined value of scope 1 and scope 2 and scope 3.
       
 
       Return the following structure:
