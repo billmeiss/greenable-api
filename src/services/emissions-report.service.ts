@@ -29,7 +29,7 @@ export class EmissionsReportService {
 
     // Prompt to check if the emissions are extreacted correctly
     const checkPrompt = `
-      Check if the emissions are extreacted correctly.
+      Check if the emissions are extreacted correctly for the company ${company}.
       If the emissions are not extreacted correctly, return what emissions are incorrect.
       If the emissions are extreacted correctly, return the emissions.
 
