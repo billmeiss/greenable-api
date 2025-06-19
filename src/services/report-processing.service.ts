@@ -54,7 +54,7 @@ export class ReportProcessingService {
 
       if (withChunking) {
         // Process all companies in parallel chunks
-        const totalProcessed = await this.processCompaniesInParallelChunks(companies, 5, mainLogger);
+        const totalProcessed = await this.processCompaniesInParallelChunks(companies, 10, mainLogger);
         
         mainLogger.log(`Completed processing of all chunks. Total companies processed: ${totalProcessed}`);
         return `Processed ${totalProcessed} companies successfully.`;
