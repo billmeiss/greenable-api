@@ -52,6 +52,8 @@ export class EmissionsReportService {
 
       If you see only a value in scope 2 and scope 1 is 'Not specified but included in calculation' it means that is the combined value of scope 1 and scope 2.
       If you see only a value in scope 3 and scope 1 and scope 2 are 'Not specified but included in calculation' it means that is the combined value of scope 1 and scope 2 and scope 3.
+
+      Scope 3 Financed emissions should be part of the scope 3 total.
       
 
       Return the following structure:
