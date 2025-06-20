@@ -75,7 +75,12 @@ export class ReportProcessingService {
    * Fetch and deduplicate companies from the spreadsheet
    */
   private async getUniqueCompanies(): Promise<string[]> {
-    const companies = await this.companyService.getCompaniesFromSheet();
+    // const companies = await this.companyService.getCompaniesFromSheet();
+    // call https://financialmodelingprep.com/stable/stock-list?apikey=qsVsSAqpJwpOCYwh5vC322kflVaAsGN0
+    const response = await fetch('https://financialmodelingprep.com/stable/stock-list?apikey=qsVsSAqpJwpOCYwh5vC322kflVaAsGN0');
+    const data = await response.json();
+    const companies: string[] = data.map((company: any) => company.companyName);
+    console.log(companies);
     return companies ? [...new Set(companies)] : [];
   }
 
