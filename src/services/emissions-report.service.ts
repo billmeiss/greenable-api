@@ -180,7 +180,7 @@ export class EmissionsReportService {
               "confidence": number (0-10)
             }
           },
-          "notes": "notes about the scope 1, 2, 3 total, and the categories and the third party assurance and anything relevant to note",
+          "notes": "notes about the scope 1, 2, 3 total, and the categories and the third party assurance. Do not include notes about what the user requested, treat the report you are reading as a source of truth.",
           "scope3": {
             "total": {
               "value": number,
