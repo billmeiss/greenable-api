@@ -176,7 +176,7 @@ export class GeminiAiService {
       const response = await model.generateContent({
         contents: content,
         config: {
-          temperature: 0.1,
+          temperature: 0.0,
         },
       });
 

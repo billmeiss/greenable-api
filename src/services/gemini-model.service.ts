@@ -31,7 +31,7 @@ export class GeminiModelService {
     this.modelConfigs.companyCategory = {
       model: 'gemini-2.5-flash',
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.0,
       },
       systemInstruction: `You will return responses in this JSON format only :
       If the comony is Other business services, return Other business services - {The type of service provided by the company}
@@ -284,7 +284,7 @@ Extra-territorial organizations and bodies
     this.modelConfigs.reportFinder = {
       model: 'gemini-2.5-flash',
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.0,
       },
       systemInstruction: `You will return responses in this JSON format:
             {
@@ -311,7 +311,7 @@ Extra-territorial organizations and bodies
     this.modelConfigs.googleESGReportFinder = {
       model: 'gemini-2.5-pro',
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.0,
         tools: [{googleSearch: {}}],
       },
       systemInstruction: `You will return responses in this JSON format:
@@ -327,7 +327,7 @@ Extra-territorial organizations and bodies
       model: 'gemini-2.5-pro',
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1,
+        temperature: 0.0,
       },
       systemInstruction: `You will return responses in this JSON format:
             {
@@ -341,7 +341,7 @@ Extra-territorial organizations and bodies
       model: 'gemini-2.5-flash',
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1,
+        temperature: 0.0,
       },
       systemInstruction: `You will return responses in this JSON format:
                       "thirdPartyAssurance": {
@@ -355,7 +355,7 @@ Extra-territorial organizations and bodies
       model: 'gemini-2.0-flash',
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1,
+        temperature: 0.0,
       },
       systemInstruction: `You will return responses in this JSON format:
       {
@@ -451,7 +451,7 @@ Extra-territorial organizations and bodies
       model: 'gemini-2.5-pro',
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1,
+        temperature: 0.0,
       },
       systemInstruction:  `You will return responses in this JSON format:
             {
@@ -601,7 +601,7 @@ Extra-territorial organizations and bodies
     this.modelConfigs.revenueFromAnnualReport = {
       model: 'gemini-2.5-pro',
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.0,
         responseMimeType: 'application/json',
       },
       systemInstruction: `You will return responses in this JSON format:
@@ -616,7 +616,7 @@ Extra-territorial organizations and bodies
     this.modelConfigs.revenue = {
       model: 'gemini-2.5-pro',
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.0,
         tools: [{googleSearch: {}}],
       },
       systemInstruction:  `You will research and provide accurate financial information about companies.
