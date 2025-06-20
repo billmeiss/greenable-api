@@ -15,7 +15,7 @@ export class GeminiApiService {
     apiCall: () => Promise<T>,
     maxRetries: number = 5,
     retryDelayMs: number = 60000, // 1 minute default delay
-    timeoutMs: number = 3 * 60 * 1000 // 3 minute timeout
+    timeoutMs: number = 10 * 60 * 1000 // 10 minute timeout
   ): Promise<T> {
     let retries = 0;
     const startTime = Date.now();

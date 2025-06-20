@@ -24,7 +24,7 @@ export class GeminiAiService {
     this.htmlPdf = new PuppeteerHTMLPDF();
     this.htmlPdf.setOptions({ 
       format: 'A4',
-      timeout: 60000, // 60 seconds timeout
+      timeout: 180000, // 3 minutes timeout
       printBackground: true
     });
   }
