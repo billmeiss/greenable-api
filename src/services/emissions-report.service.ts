@@ -124,6 +124,7 @@ export class EmissionsReportService {
 
         If the company has a portfolio of other companies, you must extract the emissions data for each company in the portfolio and return those emissions under the field "portfolioCompanies".
         Only return portfolio companies for companies that are investment holding, or financial companies.
+        The porftolio companies must be individual legal entities that are legally separate from the main company, and not sectors or aggregated parts of the portfolio.
         If a company has portfolio companies, make sure you still return the main company's / group's emissions data.
 
         If a value is only provided for Scope 1&2 total, you must check if Scope 1 is included in the calculations.
