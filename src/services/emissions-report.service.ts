@@ -180,13 +180,13 @@ export class EmissionsReportService {
               "confidence": number (0-10)
             }
           },
+          "notes": "notes about the scope 1, 2, 3 total, and the categories and the third party assurance and anything relevant to note",
           "scope3": {
             "total": {
               "value": number,
               "unit": "string",
               "confidence": number (0-10)
             },
-            "notes": "notes about the scope 1, 2, 3 total, and the categories and the third party assurance and anything relevant to note",
             "categories": {
               "1": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
                   "2": { "value": number, "unit": "string", "confidence": number (0-10), "included": boolean, "notes": "string" },
