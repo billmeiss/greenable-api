@@ -70,4 +70,19 @@ export class AppController {
   checkExistingReports() {
     return this.appService.checkExistingReports();
   }
+
+  @Get('/unchecked-reports')
+  getUncheckedReports() {
+    return this.appService.getCompaniesWithUncheckedReports();
+  }
+
+  @Post('/update-checked-reports/:companyName')
+  updateCheckedReports(@Param('companyName') companyName: string) {
+    return this.appService.updateCheckedReports(companyName);
+  }
+
+  @Post('/update-all-checked-reports')
+  updateAllCheckedReports() {
+    return this.appService.updateAllCheckedReports();
+  }
 }

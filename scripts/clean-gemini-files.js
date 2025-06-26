@@ -3,8 +3,23 @@ require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
 const fetch = require('node-fetch');
 
-// Configure fetch for the GoogleGenAI client
-global.fetch = fetch;
+// Configure fetch with increased timeout for the GoogleGenAI client
+const fetchWithTimeout = (url, options = {}) => {
+  // Set timeout to 10 minutes (600,000ms) to handle slow API responses
+  const timeout = options.timeout || 600000;
+  
+  return Promise.race([
+    fetch(url, {
+      ...options,
+      timeout: undefined // Remove timeout from fetch options since we're handling it ourselves
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Request timeout after ${timeout}ms`)), timeout)
+    )
+  ]);
+};
+
+global.fetch = fetchWithTimeout;
 
 async function main() {
   // Check if API key is available
@@ -17,8 +32,26 @@ async function main() {
   console.log("Listing all files in Google AI:");
   
   try {
-    // Using the pager style to list files
-    const pager = await ai.files.list({ config: { pageSize: 10 } });
+    // Using the pager style to list files with retry logic
+    let pager;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`Attempting to list files (attempt ${retryCount + 1}/${maxRetries})...`);
+        pager = await ai.files.list({ config: { pageSize: 10 } });
+        break; // Success, exit retry loop
+      } catch (error) {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          throw error; // Re-throw if we've exhausted retries
+        }
+        console.log(`Attempt ${retryCount} failed: ${error.message}. Retrying in 5 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+    
     let page = pager.page;
     const names = [];
     
@@ -29,7 +62,22 @@ async function main() {
         names.push(f.name);
       }
       if (!pager.hasNextPage()) break;
-      page = await pager.nextPage();
+      
+      // Add retry logic for pagination as well
+      retryCount = 0;
+      while (retryCount < maxRetries) {
+        try {
+          page = await pager.nextPage();
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            throw error;
+          }
+          console.log(`Pagination attempt ${retryCount} failed: ${error.message}. Retrying in 3 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
     }
     
     console.log(`\nFound ${names.length} files.`);
@@ -49,11 +97,24 @@ async function main() {
     // Delete all files
     console.log("\nDeleting files...");
     for (const name of names) {
-      try {
-        await ai.files.delete({ name });
-        console.log(`  Deleted: ${name}`);
-      } catch (error) {
-        console.error(`  Failed to delete ${name}:`, error.message);
+      let deleteRetryCount = 0;
+      const deleteMaxRetries = 3;
+      let deleteSuccess = false;
+      
+      while (deleteRetryCount < deleteMaxRetries && !deleteSuccess) {
+        try {
+          await ai.files.delete({ name });
+          console.log(`  Deleted: ${name}`);
+          deleteSuccess = true;
+        } catch (error) {
+          deleteRetryCount++;
+          if (deleteRetryCount >= deleteMaxRetries) {
+            console.error(`  Failed to delete ${name} after ${deleteMaxRetries} attempts:`, error.message);
+          } else {
+            console.log(`  Delete attempt ${deleteRetryCount} for ${name} failed: ${error.message}. Retrying in 2 seconds...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
       }
     }
     

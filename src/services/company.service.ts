@@ -703,6 +703,80 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
   }
 
+  /**
+   * Get companies that have error messages in column AU (notes column)
+   */
+  async getCompaniesWithErrorMessages(): Promise<any[]> {
+    try {
+      console.log(`[STEP] Fetching companies with error messages from 'Analysed Data' sheet`);
+      
+      // Read the spreadsheet including column AU (notes column)
+      // AU is column 47 (0-indexed as 46)
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `'Analysed Data'!A2:AU`
+      );
+      
+      const rows = data.values || [];
+      const allCompanies = rows.map(row => ({ 
+        name: row[0], 
+        reportUrl: row[2],
+        reportingPeriod: row[3], 
+        revenueYear: row[4], 
+        revenue: row[5], 
+        exchangeRateCountry: row[6],
+        scope1: row[9],
+        scope2Location: row[10],
+        scope2Market: row[11],
+        scope3: row[12],
+        scope3Cat1: row[13],
+        scope3Cat2: row[14],
+        scope3Cat3: row[15],
+        scope3Cat4: row[16],
+        scope3Cat5: row[17],
+        scope3Cat6: row[18],
+        scope3Cat7: row[19],
+        scope3Cat8: row[20],
+        scope3Cat9: row[21],
+        scope3Cat10: row[22],
+        scope3Cat11: row[23],
+        scope3Cat12: row[24],
+        scope3Cat13: row[25],
+        scope3Cat14: row[26],
+        scope3Cat15: row[27],
+        category: row[30],
+        revenueSource: row[33],
+        revenueUrl: row[34],
+        newRevenueUrl: row[38],
+        newRevenueAmount: row[39],
+        newRevenueCurrency: row[40],
+        notes: row[32],
+        scope3Mismatch: row[43],
+        errorNotes: row[46] // Column AU (0-indexed as 46)
+      })).filter(Boolean);
+
+      // Filter companies that have error messages in column AU
+      const companiesWithErrors = allCompanies.filter(company => {
+        const errorNotes = company.errorNotes;
+        return errorNotes && 
+               typeof errorNotes === 'string' && 
+               errorNotes.toLowerCase().includes('error');
+      });
+
+      console.log(`[RESULT] Found ${companiesWithErrors.length} companies with error messages in column AU`);
+      
+      if (companiesWithErrors.length > 0) {
+        console.log(`[DETAIL] Companies with errors: ${companiesWithErrors.map(c => c.name).slice(0, 5).join(', ')}${companiesWithErrors.length > 5 ? '...' : ''}`);
+      }
+
+      return companiesWithErrors;
+    } catch (error) {
+      console.log(`[ERROR] Error getting companies with error messages: ${error.message}`);
+      console.log(error);
+      return [];
+    }
+  }
+
   async checkReportUrlForMissingScopes(companyName: string, reportUrl: any): Promise<any> {
     const missingScopesModel = this.geminiModelService.getModel('missingScopes');
 
@@ -1519,11 +1593,13 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     try {
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `${sheetName}!A1:A`
+        `${sheetName}!A:B`
       );
       
       const attempts = data.values || [];
-      return attempts.map(attempt => attempt[0]);
+      
+      // Combine A & B
+      return [...attempts.map(attempt => attempt[0]), ...attempts.map(attempt => attempt[1])];
     } catch (error) {
       console.log(`[ERROR] Error getting attempts from sheet: ${error.message}`);
       return [];
@@ -1690,8 +1766,6 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const rows = data.values || [];
     const companyIndex = rows.findIndex(row => row[0] === company);
 
-    const emissionsToUpdate = [];
-
     if (incorrectEmissions && incorrectEmissions.length > 0) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
@@ -1699,6 +1773,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         [[incorrectEmissions.map(emission => `${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason})`).join('\n')]]
       );
     }
+
+
 
     return true;
   }
@@ -1716,5 +1792,223 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       `Analysed Data!AU${companyIndex + 2}`, 
       [[`${notes}`]]
     );
+  }
+
+  /**
+   * Map scope names to their corresponding spreadsheet columns
+   */
+  private getScopeColumnMapping(): Record<string, string> {
+    return {
+      'scope1': 'J',
+      'scope2Location': 'K',
+      'scope2Market': 'L',
+      'scope3': 'M',
+      'scope3Cat1': 'N',
+      'scope3Cat2': 'O',
+      'scope3Cat3': 'P',
+      'scope3Cat4': 'Q',
+      'scope3Cat5': 'R',
+      'scope3Cat6': 'S',
+      'scope3Cat7': 'T',
+      'scope3Cat8': 'U',
+      'scope3Cat9': 'V',
+      'scope3Cat10': 'W',
+      'scope3Cat11': 'X',
+      'scope3Cat12': 'Y',
+      'scope3Cat13': 'Z',
+      'scope3Cat14': 'AA',
+      'scope3Cat15': 'AB'
+    };
+  }
+
+  /**
+   * Parse notes from column AU and extract emission updates
+   */
+  private parseEmissionUpdatesFromNotes(notes: string): Array<{scope: string, oldValue: string, newValue: string, reason: string}> {
+    if (!notes || typeof notes !== 'string') {
+      return [];
+    }
+
+    const updates = [];
+    const lines = notes.split('\n').filter(line => line.trim());
+
+    for (const line of lines) {
+      // Match pattern: scope3: null -> 7492 ------ (explanation)
+      const match = line.match(/^(\w+):\s*([^-]*?)\s*->\s*([^-]*?)\s*------\s*\((.*)\)$/);
+      
+      if (match) {
+        const [, scope, oldValue, newValue, reason] = match;
+        updates.push({
+          scope: scope.trim(),
+          oldValue: oldValue.trim(),
+          newValue: newValue.trim(),
+          reason: reason.trim()
+        });
+      }
+    }
+
+    return updates;
+  }
+
+  /**
+   * Update checked reports by parsing notes from column AU and updating corresponding cells
+   */
+  async updateCheckedReports(companyName: string): Promise<{success: boolean, updatedCount: number, errors: string[]}> {
+    try {
+      console.log(`[STEP] Updating checked reports for ${companyName}`);
+      
+      // Find the company row
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!A2:AU`
+      );
+
+      const rows = data.values || [];
+      const companyIndex = rows.findIndex(row => row[0] === companyName);
+
+      if (companyIndex === -1) {
+        console.log(`[ERROR] Company ${companyName} not found in 'Analysed Data' sheet`);
+        return { success: false, updatedCount: 0, errors: [`Company ${companyName} not found`] };
+      }
+
+      // Get notes from column AU (index 46, 0-based)
+      const notes = rows[companyIndex][46]; // Column AU
+      
+      if (!notes) {
+        console.log(`[INFO] No notes found in column AU for ${companyName}`);
+        return { success: true, updatedCount: 0, errors: [] };
+      }
+
+      console.log(`[DETAIL] Found notes for ${companyName}: ${notes}`);
+
+      // Parse the emission updates from notes
+      const updates = this.parseEmissionUpdatesFromNotes(notes);
+      
+      if (updates.length === 0) {
+        console.log(`[INFO] No valid emission updates found in notes for ${companyName}`);
+        return { success: true, updatedCount: 0, errors: [] };
+      }
+
+      console.log(`[DETAIL] Parsed ${updates.length} emission updates for ${companyName}`);
+
+      // Get column mapping
+      const columnMapping = this.getScopeColumnMapping();
+      
+      const errors = [];
+      let updatedCount = 0;
+
+      // Process each update
+      for (const update of updates) {
+        try {
+          const columnLetter = columnMapping[update.scope];
+          
+          if (!columnLetter) {
+            console.log(`[WARNING] Unknown scope '${update.scope}' for ${companyName}`);
+            errors.push(`Unknown scope: ${update.scope}`);
+            continue;
+          }
+
+          // Prepare value for update - Google Sheets expects strings or null
+          let valueToUpdate: string | null = update.newValue;
+          if (update.newValue === 'null' || update.newValue === 'undefined') {
+            valueToUpdate = '';
+          }
+
+          console.log(`[DETAIL] Updating ${update.scope} (${columnLetter}${companyIndex + 2}) from '${update.oldValue}' to '${valueToUpdate}' for ${companyName}`);
+
+          // Update the cell
+          await this.sheetsApiService.updateValues(
+            this.SPREADSHEET_ID,
+            `Analysed Data!${columnLetter}${companyIndex + 2}`,
+            [[valueToUpdate]]
+          );
+
+          updatedCount++;
+          console.log(`[SUCCESS] Updated ${update.scope} for ${companyName}`);
+          
+        } catch (updateError) {
+          const errorMsg = `Failed to update ${update.scope}: ${updateError.message}`;
+          console.log(`[ERROR] ${errorMsg}`);
+          errors.push(errorMsg);
+        }
+      }
+
+      // Mark as processed by updating column AV with "Checked and Updated"
+      try {
+        await this.sheetsApiService.updateValues(
+          this.SPREADSHEET_ID,
+          `Analysed Data!AV${companyIndex + 2}`,
+          [['Checked and Updated']]
+        );
+        console.log(`[SUCCESS] Marked ${companyName} as checked and updated`);
+      } catch (error) {
+        console.log(`[WARNING] Failed to mark ${companyName} as processed: ${error.message}`);
+        errors.push(`Failed to mark as processed: ${error.message}`);
+      }
+
+      console.log(`[RESULT] Successfully updated ${updatedCount} emission values for ${companyName}`);
+      
+      return {
+        success: errors.length === 0 || updatedCount > 0,
+        updatedCount,
+        errors
+      };
+
+    } catch (error) {
+      console.log(`[ERROR] Error updating checked reports for ${companyName}: ${error.message}`);
+      return {
+        success: false,
+        updatedCount: 0,
+        errors: [error.message]
+      };
+    }
+  }
+
+  /**
+   * Get all companies that have notes in column AU but haven't been processed yet
+   */
+  async getCompaniesWithUncheckedReports(): Promise<any[]> {
+    try {
+      console.log(`[STEP] Fetching companies with unchecked reports from 'Analysed Data' sheet`);
+      
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `'Analysed Data'!A2:AV`
+      );
+      
+      const rows = data.values || [];
+      const companiesWithUncheckedReports = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const companyName = row[0];
+        const notes = row[46]; // Column AU (0-indexed as 46)
+        const processedFlag = row[47]; // Column AV (0-indexed as 47)
+        
+        // Check if company has notes in AU but hasn't been processed (AV is not "Checked and Updated")
+        if (companyName && notes && 
+            typeof notes === 'string' && 
+            notes.includes('->') && processedFlag !== 'Checked and Updated') {
+          
+          companiesWithUncheckedReports.push({
+            name: companyName,
+            notes: notes,
+            rowIndex: i + 2 // +2 because we started from A2
+          });
+        }
+      }
+
+      console.log(`[RESULT] Found ${companiesWithUncheckedReports.length} companies with unchecked reports`);
+      
+      if (companiesWithUncheckedReports.length > 0) {
+        console.log(`[DETAIL] Companies with unchecked reports: ${companiesWithUncheckedReports.map(c => c.name).slice(0, 5).join(', ')}${companiesWithUncheckedReports.length > 5 ? '...' : ''}`);
+      }
+
+      return companiesWithUncheckedReports;
+    } catch (error) {
+      console.log(`[ERROR] Error getting companies with unchecked reports: ${error.message}`);
+      console.log(error);
+      return [];
+    }
   }
 }

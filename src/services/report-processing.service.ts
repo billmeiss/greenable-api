@@ -80,7 +80,12 @@ export class ReportProcessingService {
     const response = await fetch('https://financialmodelingprep.com/stable/stock-list?apikey=qsVsSAqpJwpOCYwh5vC322kflVaAsGN0');
     const data = await response.json();
     const companies: string[] = data.map((company: any) => company.companyName);
-    console.log(companies);
+    console.log(companies.length)
+    // Remove comapnies that have already been processed
+    const processedCompanies = await this.companyService.getAttemptsFromSheet();
+    console.log({ processedCompanies})
+    const companiesToProcess = companies.filter(company => !processedCompanies.includes(company));
+    console.log(companiesToProcess);
     return companies ? [...new Set(companies)] : [];
   }
 
@@ -148,8 +153,8 @@ export class ReportProcessingService {
     
     for (const company of companies) {
       try {
-        const relatedCompanies = await this.companyService.getRelatedCompanies(company);
-        for (const relatedCompany of [company, ...relatedCompanies]) {
+        // const relatedCompanies = await this.companyService.getRelatedCompanies(company);
+        for (const relatedCompany of [company]) {
           const companyName = await this.processCompany(relatedCompany);
           this.companyService.addAttemptToSheet(company, companyName);
           if (companyName) {

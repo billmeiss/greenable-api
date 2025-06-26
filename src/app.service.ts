@@ -314,6 +314,136 @@ export class AppService {
       this.logger.log(`Processed batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(companies.length / batchSize)} (companies ${i + 1}-${Math.min(i + batchSize, companies.length)})`);
     }
   }
+
+  /**
+   * Get all companies that have unchecked reports (notes in column AU that haven't been processed)
+   */
+  async getCompaniesWithUncheckedReports(): Promise<any[]> {
+    try {
+      this.logger.log('Getting companies with unchecked reports');
+      return await this.companyService.getCompaniesWithUncheckedReports();
+    } catch (error) {
+      this.logger.error(`Error getting companies with unchecked reports: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Update checked reports for a specific company by parsing notes from column AU
+   */
+  async updateCheckedReports(companyName: string): Promise<any> {
+    try {
+      this.logger.log(`Updating checked reports for company: ${companyName}`);
+      const result = await this.companyService.updateCheckedReports(companyName);
+      
+      if (result.success) {
+        this.logger.log(`Successfully updated ${result.updatedCount} emission values for ${companyName}`);
+      } else {
+        this.logger.error(`Failed to update checked reports for ${companyName}: ${result.errors.join(', ')}`);
+      }
+      
+      return result;
+    } catch (error) {
+      this.logger.error(`Error updating checked reports for ${companyName}: ${error.message}`);
+      return {
+        success: false,
+        updatedCount: 0,
+        errors: [error.message]
+      };
+    }
+  }
+
+  /**
+   * Update checked reports for all companies that have unchecked reports
+   */
+  async updateAllCheckedReports(): Promise<any> {
+    try {
+      this.logger.log('Starting bulk update of all checked reports');
+      
+      const companiesWithUncheckedReports = await this.companyService.getCompaniesWithUncheckedReports();
+      
+      if (companiesWithUncheckedReports.length === 0) {
+        this.logger.log('No companies with unchecked reports found');
+        return {
+          success: true,
+          message: 'No companies with unchecked reports found',
+          totalCompanies: 0,
+          successfulUpdates: 0,
+          failedUpdates: 0,
+          results: []
+        };
+      }
+      
+      this.logger.log(`Found ${companiesWithUncheckedReports.length} companies with unchecked reports`);
+      
+      const results = [];
+      let successfulUpdates = 0;
+      let failedUpdates = 0;
+      
+      // Process companies in batches to avoid overwhelming the system
+      const batchSize = 5;
+      for (let i = 0; i < companiesWithUncheckedReports.length; i += batchSize) {
+        const batch = companiesWithUncheckedReports.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (company) => {
+          try {
+            const result = await this.companyService.updateCheckedReports(company.name);
+            
+            if (result.success) {
+              successfulUpdates++;
+              this.logger.log(`Successfully updated ${result.updatedCount} values for ${company.name}`);
+            } else {
+              failedUpdates++;
+              this.logger.error(`Failed to update ${company.name}: ${result.errors.join(', ')}`);
+            }
+            
+            return {
+              companyName: company.name,
+              ...result
+            };
+          } catch (error) {
+            failedUpdates++;
+            this.logger.error(`Error processing ${company.name}: ${error.message}`);
+            return {
+              companyName: company.name,
+              success: false,
+              updatedCount: 0,
+              errors: [error.message]
+            };
+          }
+        });
+        
+        // Wait for all companies in the current batch to complete
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+        
+        this.logger.log(`Processed batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(companiesWithUncheckedReports.length / batchSize)} (companies ${i + 1}-${Math.min(i + batchSize, companiesWithUncheckedReports.length)})`);
+      }
+      
+      const summary = {
+        success: failedUpdates === 0,
+        message: `Processed ${companiesWithUncheckedReports.length} companies: ${successfulUpdates} successful, ${failedUpdates} failed`,
+        totalCompanies: companiesWithUncheckedReports.length,
+        successfulUpdates,
+        failedUpdates,
+        results
+      };
+      
+      this.logger.log(summary.message);
+      return summary;
+      
+    } catch (error) {
+      this.logger.error(`Error in bulk update of checked reports: ${error.message}`);
+      return {
+        success: false,
+        message: `Error in bulk update: ${error.message}`,
+        totalCompanies: 0,
+        successfulUpdates: 0,
+        failedUpdates: 0,
+        results: []
+      };
+    }
+  }
 }
 
 
