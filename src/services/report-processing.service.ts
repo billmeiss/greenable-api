@@ -85,8 +85,7 @@ export class ReportProcessingService {
     const processedCompanies = await this.companyService.getAttemptsFromSheet();
     console.log({ processedCompanies})
     const companiesToProcess = companies.filter(company => !processedCompanies.includes(company));
-    console.log(companiesToProcess);
-    return companies ? [...new Set(companies)] : [];
+    return companiesToProcess ? [...new Set(companiesToProcess)] : [];
   }
 
   /**
