@@ -86,8 +86,8 @@ export class AppService {
   async updateCountries(): Promise<any> {
     const companies = await this.companyService.getExistingCompaniesFromSheet();
     for (const company of companies) {
-      const { name } = company;
-      const { country } = await this.companyService.determineCompanyCountry(name);
+      const { name, reportUrl } = company;
+      const { country } = await this.companyService.determineCompanyCountry(name, reportUrl);
       await this.companyService.updateCompanyCountry(name, country);
     }
   }

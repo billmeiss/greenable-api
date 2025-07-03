@@ -189,7 +189,7 @@ export class ReportProcessingService {
     // 3. Get company revenue data for the same reporting period as emissions
     const reportingPeriod = emissionsData?.reportingPeriod || null;
     const revenueData = await this.companyService.getCompanyRevenue(emissionsData.company.name, reportingPeriod);
-    const countryData = await this.companyService.determineCompanyCountry(emissionsData.company.name);
+    const countryData = await this.companyService.determineCompanyCountry(emissionsData.company.name, reportUrl);
     const companyCategory = await this.companyService.getCompanyCategory(emissionsData.company.name);
     
     // 5. Add data to spreadsheet

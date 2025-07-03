@@ -1067,7 +1067,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   /**
    * Determine the country of a company
    */
-  async determineCompanyCountry(companyName: string): Promise<CountryData | null> {
+  async determineCompanyCountry(companyName: string, reportUrl?: string): Promise<CountryData | null> {
     try {
       const countryFinderModel = this.geminiModelService.getModel('countryFinder');
       
@@ -1079,6 +1079,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         - If the company has multiple headquarters, identify the main/global HQ location
         - For multinational companies, identify where the parent company is registered
         - Use reliable, recent sources for your determination
+        ${reportUrl ? `- IMPORTANT: Use the company's report provided for additional context about the company's location and headquarters` : ''}
         
         Return your answer in the following JSON format only:
         
@@ -1094,6 +1095,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         - 4-6 = From less authoritative sources
         - 1-3 = Based on limited or potentially outdated information
         - 0 = Unable to determine with any confidence
+        ${reportUrl ? `- Add +1 to confidence if information is confirmed from the provided company report` : ''}
         
         Example 1:
         For "Apple Inc", the response would be:
@@ -1112,7 +1114,30 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         }
       `;
       
-      const result = await this.geminiApiService.handleGeminiCall(
+      let result;
+      
+      if (reportUrl) {
+        // Use the AI service to process the report URL for additional context
+        result = await this.geminiApiService.handleGeminiCall(
+          () => this.geminiAiService.processUrl(reportUrl, prompt, 'countryFinder'),
+          2,
+          1000,
+          10 * 60 * 1000
+        );
+        
+        // Parse the response since processUrl returns a string
+        const parsedResponse = this.geminiApiService.safelyParseJson(result);
+        
+        if (parsedResponse && parsedResponse.country) {
+          return parsedResponse as CountryData;
+        }
+        
+        // If report URL processing fails, fall back to the standard method
+        this.logger.warn(`Failed to determine country from report URL for ${companyName}, falling back to standard method`);
+      }
+      
+      // Standard method without report URL
+      result = await this.geminiApiService.handleGeminiCall(
         () => countryFinderModel.generateContent({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         })
