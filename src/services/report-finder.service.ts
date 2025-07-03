@@ -228,6 +228,8 @@ export class ReportFinderService {
         break;
       }
 
+      attemptCount++;
+
       const untriedUrls = searchResults.filter(result => !triedUrls.has(result.link)).map(result => result.link);
       
       const url = await this.verifyCorrectReport(untriedUrls, company);
@@ -242,7 +244,6 @@ export class ReportFinderService {
       if (!url) continue;
       
       triedUrls.add(url);
-      attemptCount++;
       
       try {
         // If it's a PDF, process directly
@@ -310,9 +311,10 @@ export class ReportFinderService {
 
   async verifyCorrectReportWithGemini(reportUrls: string[], company: string): Promise<any> {
     const existingCompanies = await this.companyService.getExistingCompaniesFromSheet();
-    const attempts = await this.companyService.getAttemptsFromSheet();
 
-    const companiesToExclude = [...existingCompanies.map(company => company.name), ...attempts];
+    const companiesToExclude = [...existingCompanies.map(company => company.name)];
+
+    console.log(companiesToExclude)
  
     const reportFinderModel = this.geminiModelService.getModel('reportFinder');
       
@@ -328,9 +330,6 @@ export class ReportFinderService {
         2. From the company's own website (rather than a third-party site)
         3. A comprehensive primary source (not a summary or press release)
         4. The most recent available report
-
-        Make sure to disclude any reports from this list:
-        ${companiesToExclude.join(', ')}
         
         Consider factors like:
         - URL patterns (e.g., contains terms like 'sustainability', 'ESG', 'annual', 'report')
@@ -345,6 +344,8 @@ export class ReportFinderService {
         - confidence: a score from 0-10 indicating your confidence in this selection
         - reasoning: brief explanation of why you selected this report
         - year: the likely year of the report (if detectable from the URL)
+
+        If you cannot find a report, return { bestReportUrl: null, firstReportCompany: null, companyName: null, confidence: 0, reasoning: null, year: null }.
       `;
       
       console.log(`[STEP] Sending verification request to Gemini AI for ${company}`);

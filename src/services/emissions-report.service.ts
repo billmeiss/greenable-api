@@ -120,7 +120,7 @@ export class EmissionsReportService {
     try {
       // Configure prompt for emissions data extraction
       const extractionPrompt = `
-        Extract greenhouse gas emissions data from this sustainability/ESG report for ${company}.
+        Extract greenhouse gas emissions data from this sustainability/ESG report for ${company}. If you cannot find ${company} company, return the company of the report.
 
         If the company has a portfolio of other companies, you must extract the emissions data for each company in the portfolio and return those emissions under the field "portfolioCompanies".
         Only return portfolio companies for companies that are investment holding, or financial companies.
@@ -270,7 +270,7 @@ export class EmissionsReportService {
         12. End-of-life treatment of sold products
         13. Downstream leased assets
         14. Franchises
-        15. Investments
+        15. Investments (Look for the absolute emissions value of investments/loans)
         
         For each category, determine:
         - The precise emissions value (if provided)
