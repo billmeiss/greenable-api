@@ -448,7 +448,7 @@ Extra-territorial organizations and bodies
 
     // ESG model
     this.modelConfigs.esg = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-pro',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.0,
