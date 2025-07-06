@@ -17,6 +17,14 @@ export class GeminiModelService {
       model: 'gemini-2.5-flash-lite-preview-06-17',
     };
 
+    this.modelConfigs.validateCompany = {
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.0,
+      },
+    }
+
     this.modelConfigs.companyNameChecker = {
       model: 'gemini-2.5-flash-lite-preview-06-17',
       generationConfig: {

@@ -1794,12 +1794,34 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     if (incorrectEmissions && incorrectEmissions.length > 0) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AU${companyIndex + 2}`,
+        `Analysed Data!AU${companyIndex + 2}:AX${companyIndex + 2}`,
         [[incorrectEmissions.map(emission => `${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason})`).join('\n')]]
       );
     }
 
 
+
+    return true;
+  }
+
+  async updateCompanyType(company: string, companyType: string, companyTypeConfidence: number, companyTypeReason: string): Promise<any> {
+    const data = await this.sheetsApiService.getValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!A2:E`
+    );
+    const rows = data.values || [];
+    const companyIndex = rows.findIndex(row => row[0] === company);
+
+    if (companyIndex === -1) {
+      console.log(`[ERROR] Company ${company} not found in 'Analysed Data' sheet`);
+      return false;
+    }
+
+    await this.sheetsApiService.updateValues(
+      this.SPREADSHEET_ID,
+      `Analysed Data!AV${companyIndex + 2}:AY${companyIndex + 2}`,
+      [[companyType, companyTypeConfidence, companyTypeReason]]
+    );
 
     return true;
   }

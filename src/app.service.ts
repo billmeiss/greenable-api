@@ -283,7 +283,7 @@ export class AppService {
   }
 
   async checkExistingReports(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5425 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 8920 });
     
     // Process companies in batches of 3
     const batchSize = 6;
@@ -443,6 +443,74 @@ export class AppService {
         results: []
       };
     }
+  }
+
+  /**
+   * Classify company type based on report content
+   */
+  async classifyCompanyType(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 7667 });
+    
+    if (companies.length === 0) {
+      this.logger.log('No companies found for classification');
+      return {
+        success: true,
+        message: 'No companies found for classification',
+        totalCompanies: 0,
+        successfulClassifications: 0,
+        failedClassifications: 0
+      };
+    }
+    
+    this.logger.log(`Found ${companies.length} companies to classify`);
+    
+    let successfulClassifications = 0;
+    let failedClassifications = 0;
+    
+    // Process companies in batches to avoid overwhelming the system
+    const batchSize = 5;
+    for (let i = 0; i < companies.length; i += batchSize) {
+      const batch = companies.slice(i, i + batchSize);
+      
+      const batchPromises = batch.map(async (company) => {
+        const { name, reportUrl } = company;
+        this.logger.log(`Classifying company type for ${name} with report URL: ${reportUrl}`);
+        
+        try {
+          const result = await this.emissionsReportService.classifyCompanyType(name, reportUrl);
+        
+          if (result) {
+            await this.companyService.updateCompanyType(name, result.companyType === 'ELSE' ? '' : result.companyType, result.companyTypeConfidence, result.companyTypeReason);
+            successfulClassifications++;
+            this.logger.log(`Successfully classified ${name} as ${result.companyType}`);
+          } else {
+            await this.companyService.updateCompanyType(name, 'unknown', 0, 'Could not classify company type');
+            failedClassifications++;
+            this.logger.warn(`Could not classify company type for ${name}`);
+          }
+        } catch (error) {
+          this.logger.error(`Error classifying company type for ${name}: ${error.message}`);
+          await this.companyService.updateCompanyType(name, 'unknown', 0, 'Error classifying company type');
+          failedClassifications++;
+        }
+      });
+      
+      // Wait for all companies in the current batch to complete
+      await Promise.all(batchPromises);
+      
+      this.logger.log(`Processed batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(companies.length / batchSize)} (companies ${i + 1}-${Math.min(i + batchSize, companies.length)})`);
+    }
+    
+    const summary = {
+      success: failedClassifications === 0,
+      message: `Processed ${companies.length} companies: ${successfulClassifications} successful, ${failedClassifications} failed`,
+      totalCompanies: companies.length,
+      successfulClassifications,
+      failedClassifications
+    };
+    
+    this.logger.log(summary.message);
+    return summary;
   }
 }
 

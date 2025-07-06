@@ -85,4 +85,9 @@ export class AppController {
   updateAllCheckedReports() {
     return this.appService.updateAllCheckedReports();
   }
+
+  @Post('/classify-company-type')
+  classifyCompanyType() {
+    return this.appService.classifyCompanyType();
+  }
 }

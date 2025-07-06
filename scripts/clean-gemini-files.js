@@ -21,6 +21,34 @@ const fetchWithTimeout = (url, options = {}) => {
 
 global.fetch = fetchWithTimeout;
 
+async function deleteFilesInBatch(ai, files, batchNumber) {
+  console.log(`\nDeleting batch ${batchNumber} (${files.length} files)...`);
+  
+  for (const file of files) {
+    let deleteRetryCount = 0;
+    const deleteMaxRetries = 3;
+    let deleteSuccess = false;
+    
+    while (deleteRetryCount < deleteMaxRetries && !deleteSuccess) {
+      try {
+        await ai.files.delete({ name: file.name });
+        console.log(`  Deleted: ${file.name}`);
+        deleteSuccess = true;
+      } catch (error) {
+        deleteRetryCount++;
+        if (deleteRetryCount >= deleteMaxRetries) {
+          console.error(`  Failed to delete ${file.name} after ${deleteMaxRetries} attempts:`, error.message);
+        } else {
+          console.log(`  Delete attempt ${deleteRetryCount} for ${file.name} failed: ${error.message}. Retrying in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
+  }
+  
+  console.log(`Batch ${batchNumber} completed.`);
+}
+
 async function main() {
   // Check if API key is available
   if (!process.env.GEMINI_API_KEY) {
@@ -29,7 +57,7 @@ async function main() {
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  console.log("Listing all files in Google AI:");
+  console.log("Processing files in Google AI (deleting after each batch):");
   
   try {
     // Using the pager style to list files with retry logic
@@ -53,14 +81,34 @@ async function main() {
     }
     
     let page = pager.page;
-    const names = [];
+    let batchNumber = 1;
+    let totalFilesProcessed = 0;
     
-    // First, list all files
+    // Ask for confirmation before starting deletion
+    console.log("\nWARNING: This will delete ALL files in batches as they are found.");
+    console.log("Press Ctrl+C to cancel or wait 5 seconds to continue...");
+    
+    // Wait for 5 seconds to give user a chance to cancel
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Process and delete files batch by batch
     while (true) {
+      const currentBatch = [];
+      
+      // Collect files in current batch
       for (const f of page) {
         console.log("  ", f.name);
-        names.push(f.name);
+        currentBatch.push(f);
       }
+      
+      // Delete files in current batch if any exist
+      if (currentBatch.length > 0) {
+        await deleteFilesInBatch(ai, currentBatch, batchNumber);
+        totalFilesProcessed += currentBatch.length;
+        batchNumber++;
+      }
+      
+      // Check if there are more pages
       if (!pager.hasNextPage()) break;
       
       // Add retry logic for pagination as well
@@ -80,45 +128,12 @@ async function main() {
       }
     }
     
-    console.log(`\nFound ${names.length} files.`);
-    
-    if (names.length === 0) {
-      console.log("No files to delete.");
-      return;
+    if (totalFilesProcessed === 0) {
+      console.log("No files found to delete.");
+    } else {
+      console.log(`\nOperation completed. Total files processed: ${totalFilesProcessed} in ${batchNumber - 1} batches.`);
     }
     
-    // Ask for confirmation before deletion
-    console.log("\nWARNING: This will delete ALL files listed above.");
-    console.log("Press Ctrl+C to cancel or wait 5 seconds to continue...");
-    
-    // Wait for 5 seconds to give user a chance to cancel
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    // Delete all files
-    console.log("\nDeleting files...");
-    for (const name of names) {
-      let deleteRetryCount = 0;
-      const deleteMaxRetries = 3;
-      let deleteSuccess = false;
-      
-      while (deleteRetryCount < deleteMaxRetries && !deleteSuccess) {
-        try {
-          await ai.files.delete({ name });
-          console.log(`  Deleted: ${name}`);
-          deleteSuccess = true;
-        } catch (error) {
-          deleteRetryCount++;
-          if (deleteRetryCount >= deleteMaxRetries) {
-            console.error(`  Failed to delete ${name} after ${deleteMaxRetries} attempts:`, error.message);
-          } else {
-            console.log(`  Delete attempt ${deleteRetryCount} for ${name} failed: ${error.message}. Retrying in 2 seconds...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-        }
-      }
-    }
-    
-    console.log("\nOperation completed.");
   } catch (error) {
     console.error("Error listing or deleting files:", error.message);
     if (error.response) {

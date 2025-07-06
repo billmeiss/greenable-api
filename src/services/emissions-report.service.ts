@@ -10,6 +10,12 @@ interface EmissionsResult {
   reportUrl: string;
 }
 
+interface CompanyTypeResult {
+  companyType: 'fund' | 'ELSE';
+  companyTypeConfidence: number;
+  companyTypeReason: string;
+}
+
 @Injectable()
 export class EmissionsReportService {
   private readonly logger = new Logger(EmissionsReportService.name);
@@ -54,10 +60,12 @@ export class EmissionsReportService {
       If you see only a value in scope 3 and scope 1 and scope 2 are 'Not specified but included in calculation' it means that is the combined value of scope 1 and scope 2 and scope 3.
 
       Scope 3 Financed emissions should be part of the scope 3 total.
-      
+
+    
 
       Return the following structure:
       {
+
         "incorrectEmissions"?: Array<{
           {
             "correctValue": number,
@@ -108,7 +116,84 @@ export class EmissionsReportService {
 
     const parsedResult = this.geminiApiService.safelyParseJson(result);
 
-    return parsedResult?.incorrectEmissions;
+    if (!parsedResult) {
+      return null;
+    }
+
+    return parsedResult.incorrectEmissions;
+  }
+
+  /**
+   * Classify company type based on report content
+   */
+  async classifyCompanyType(companyName: string, reportUrl: string): Promise<CompanyTypeResult | null> {
+    console.log(`[STEP] Classifying company type for ${companyName}: ${reportUrl}`);
+
+    const classificationPrompt = `
+      Analyze the company ${companyName} and determine its type based on the report content and company name, report url: ${reportUrl}.
+
+      If you cannot access the report, just continue based on the company name. Do not say you cannot access the report.
+
+      Company Type Classification:
+      - "fund": Investment funds, mutual funds, ETFs, private equity funds, hedge funds, venture capital funds, etc. but they have to be able to be invested in and tradeable. 
+      - "ELSE": All other companies and real estate investment trusts
+
+      Please analyze the company's business model, activities, and structure described in the report.
+      Look for indicators such as:
+      - Investment activities and portfolio management
+      - Real estate holdings and management
+      - Manufacturing or service operations
+      - Financial services provision
+      - Asset management activities
+
+      Return the following JSON structure:
+      {
+        "companyType": "fund" | "ELSE",
+        "companyTypeConfidence": number (0-10),
+        "companyTypeReason": "string explaining why this classification was chosen"
+      }
+
+      If you cannot determine the company type with reasonable confidence, return null.
+    `;
+
+    try {
+      // don't upload the report to the model
+      const companyTypeModel = this.geminiModelService.getModel('generic');
+      const processedResult = await this.geminiApiService.handleGeminiCall(
+        () => companyTypeModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: classificationPrompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.0,
+          },
+          systemInstruction: `You will return responses in this JSON format:
+          {
+            "companyType": "fund" | "ELSE",
+            "companyTypeConfidence": number (0-10),
+            "companyTypeReason": "string explaining why this classification was chosen"
+          }`
+        })
+      );
+
+      const parsedResult = this.geminiApiService.safelyParseJson(processedResult.text);
+
+      if (!parsedResult || !parsedResult.companyType) {
+        console.log(`[RESULT] Could not classify company type for ${companyName}`);
+        return null;
+      }
+
+      console.log(`[RESULT] Company type classification for ${companyName}: ${parsedResult.companyType} (confidence: ${parsedResult.companyTypeConfidence})`);
+      console.log(`[DETAIL] Reason: ${parsedResult.companyTypeReason}`);
+
+      return {
+        companyType: parsedResult.companyType,
+        companyTypeConfidence: parsedResult.companyTypeConfidence,
+        companyTypeReason: parsedResult.companyTypeReason
+      };
+    } catch (error) {
+      console.log(`[ERROR] Error classifying company type for ${companyName}: ${error.message}`);
+      return null;
+    }
   }
 
   /**
