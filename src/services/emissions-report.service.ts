@@ -35,15 +35,49 @@ export class EmissionsReportService {
 
     // Prompt to check if the emissions are extreacted correctly
     const checkPrompt = `
-      Check if the emissions are extreacted correctly for the company ${company}.
-      If the emissions are not extreacted correctly, return what emissions are incorrect.
-      If the emissions are extreacted correctly, return the emissions.
+      Check if the emissions are extracted correctly for the company ${company}.
+      If the emissions are not extracted correctly, return what emissions are incorrect.
+      If the emissions are extracted correctly, return the emissions.
 
       The existing emissions are:
       ${Object.keys(emissions).map(key => `${key}: ${emissions[key]}`).join('\n')}
 
+      CRITICAL: Pay special attention to values extracted from colored charts and graphs:
+      - Verify that color associations in legends match the extracted data
+      - Double-check that bar chart colors correctly correspond to the scope/category values
+      - Ensure pie chart segment colors match their labels and extracted values
+      - Cross-reference visual data with any accompanying tables or text
+      - Look for color-coding inconsistencies across different charts in the same report
+      - Be extra careful with similar colors (e.g., light blue vs. dark blue) that might be misidentified
+      - Verify that stacked bar chart segments are correctly attributed to their respective scopes
+      - Check that trend line colors in multi-year charts match the correct emission categories
+
+      CRITICAL: Pay special attention to values extracted from tables:
+      - Verify that row and column headers are correctly matched to their corresponding values
+      - Ensure that units in table headers match the extracted values (tons vs. kilotons vs. metric tons)
+      - Double-check that multi-row or multi-column spanning cells are correctly interpreted
+      - Confirm that subtotals and totals in tables are not confused with individual category values
+      - Verify that the correct reporting year/period column is being read from multi-year tables
+      - Check that scope categories are correctly mapped to their numerical values in the table
+      - Ensure that footnote references or asterisks don't interfere with numerical value extraction
+      - Confirm that percentage values are not confused with absolute emission values
+      - Verify that "N/A", "Not applicable", or "-" entries are correctly interpreted as null values
+      - Cross-check table values against any summary statements or executive summary figures
+      - Ensure that nested or hierarchical table structures are correctly parsed (e.g., Scope 3 subcategories under main categories)
+
+      CRITICAL: Verify that emissions are extracted for the correct company entity:
+      - Confirm that the extracted emissions belong specifically to "${company}" and not its parent company, subsidiaries, or other related entities
+      - If the report contains data for multiple companies (parent/subsidiary structure), ensure you're extracting data for the requested company only
+      - Look for section headers, table titles, or labels that specify which company entity the emissions data applies to
+      - Be aware that some reports may show consolidated group emissions vs. individual entity emissions - extract only the requested entity's data
+      - If "${company}" is a subsidiary and the report only shows parent company emissions, do not extract those values
+      - If "${company}" is a parent company and the report only shows subsidiary emissions, do not extract those values unless they are consolidated figures for the parent
+      - If the requested company has no emissions data in the report (e.g., subsidiary with no operations), leave the emission values blank/null
+      - Check that company names, legal entity identifiers, or organizational charts clearly indicate the emissions belong to the correct entity
+      - Pay attention to disclaimers or notes about data scope and which entities are included in the reported figures
+
       If all the emissions are correct, return null
-      If there is an emission that is included in the caluclations but their value is not provided or disaggrageted, return 'Not specified but included in calculation'
+      If there is an emission that is included in the calculations but their value is not provided or disaggregated, return 'Not specified but included in calculation'
 
       Working from home is part of Scope 3 Category 7.
       Ignore Scope 2 market based vs location based nuances.
@@ -61,14 +95,17 @@ export class EmissionsReportService {
 
       Scope 3 Financed emissions should be part of the scope 3 total.
 
-    
-
       Return the following structure:
       {
-
+        "companyVerification": {
+          "extractedForCorrectCompany": boolean,
+          "extractedCompanyName": "string - the actual company name the emissions data belongs to",
+          "reason": "string - explanation of company match/mismatch"
+        },
         "incorrectEmissions"?: Array<{
           {
             "correctValue": number,
+            "companyName": string,
             "reason": string,
             "scope": string,
             "value": number,
@@ -77,6 +114,8 @@ export class EmissionsReportService {
           },
         ]
       }
+
+      If emissions were already extracted correctly, return null.
 
       The instructions to help you extract the emissions are:
       Focus on finding precise values for:

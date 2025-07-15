@@ -1794,8 +1794,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     if (incorrectEmissions && incorrectEmissions.length > 0) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AU${companyIndex + 2}:AX${companyIndex + 2}`,
-        [[incorrectEmissions.map(emission => `${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason})`).join('\n')]]
+        `Analysed Data!AW${companyIndex + 2}:AX${companyIndex + 2}`,
+        [[incorrectEmissions.map(emission => `${emission.companyName} - ${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason} --- ${emission.confidence})`).join('\n'), 'Not checked or updated']]
       );
     }
 
