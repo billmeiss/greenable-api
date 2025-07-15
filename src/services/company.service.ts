@@ -1900,14 +1900,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   /**
    * Update checked reports by parsing notes from column AU and updating corresponding cells
    */
-  async updateCheckedReports(companyName: string): Promise<{success: boolean, updatedCount: number, errors: string[]}> {
+  async updateCheckedReports(companyName: string, fromRow: number = 2): Promise<{success: boolean, updatedCount: number, errors: string[]}> {
     try {
-      console.log(`[STEP] Updating checked reports for ${companyName}`);
+      console.log(`[STEP] Updating checked reports for ${companyName} starting from row ${fromRow}`);
       
       // Find the company row
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!A2:AU`
+        `Analysed Data!A${fromRow}:AU`
       );
 
       const rows = data.values || [];
@@ -1917,6 +1917,9 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         console.log(`[ERROR] Company ${companyName} not found in 'Analysed Data' sheet`);
         return { success: false, updatedCount: 0, errors: [`Company ${companyName} not found`] };
       }
+
+      // Calculate the actual row number in the sheet
+      const actualRowNumber = fromRow + companyIndex;
 
       // Get notes from column AU (index 46, 0-based)
       const notes = rows[companyIndex][46]; // Column AU
@@ -1961,12 +1964,12 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
             valueToUpdate = '';
           }
 
-          console.log(`[DETAIL] Updating ${update.scope} (${columnLetter}${companyIndex + 2}) from '${update.oldValue}' to '${valueToUpdate}' for ${companyName}`);
+          console.log(`[DETAIL] Updating ${update.scope} (${columnLetter}${actualRowNumber}) from '${update.oldValue}' to '${valueToUpdate}' for ${companyName}`);
 
-          // Update the cell
+          // Update the cell with correct row calculation
           await this.sheetsApiService.updateValues(
             this.SPREADSHEET_ID,
-            `Analysed Data!${columnLetter}${companyIndex + 2}`,
+            `Analysed Data!${columnLetter}${actualRowNumber}`,
             [[valueToUpdate]]
           );
 
@@ -1980,11 +1983,11 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         }
       }
 
-      // Mark as processed by updating column AV with "Checked and Updated"
+      // Mark as processed by updating column AV with correct row calculation
       try {
         await this.sheetsApiService.updateValues(
           this.SPREADSHEET_ID,
-          `Analysed Data!AV${companyIndex + 2}`,
+          `Analysed Data!AV${actualRowNumber}`,
           [['Checked and Updated']]
         );
         console.log(`[SUCCESS] Marked ${companyName} as checked and updated`);
@@ -2014,13 +2017,13 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   /**
    * Get all companies that have notes in column AU but haven't been processed yet
    */
-  async getCompaniesWithUncheckedReports(): Promise<any[]> {
+  async getCompaniesWithUncheckedReports(fromRow: number = 2): Promise<any[]> {
     try {
-      console.log(`[STEP] Fetching companies with unchecked reports from 'Analysed Data' sheet`);
+      console.log(`[STEP] Fetching companies with unchecked reports from 'Analysed Data' sheet starting from row ${fromRow}`);
       
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A2:AV`
+        `'Analysed Data'!A${fromRow}:AV`
       );
       
       const rows = data.values || [];
@@ -2040,7 +2043,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
           companiesWithUncheckedReports.push({
             name: companyName,
             notes: notes,
-            rowIndex: i + 2 // +2 because we started from A2
+            rowIndex: fromRow + i // Correct calculation using fromRow parameter
           });
         }
       }

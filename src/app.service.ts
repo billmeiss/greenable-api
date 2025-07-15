@@ -318,10 +318,10 @@ export class AppService {
   /**
    * Get all companies that have unchecked reports (notes in column AU that haven't been processed)
    */
-  async getCompaniesWithUncheckedReports(): Promise<any[]> {
+  async getCompaniesWithUncheckedReports(fromRow: number = 5521): Promise<any[]> {
     try {
-      this.logger.log('Getting companies with unchecked reports');
-      return await this.companyService.getCompaniesWithUncheckedReports();
+      this.logger.log(`Getting companies with unchecked reports from row ${fromRow}`);
+      return await this.companyService.getCompaniesWithUncheckedReports(fromRow);
     } catch (error) {
       this.logger.error(`Error getting companies with unchecked reports: ${error.message}`);
       return [];
@@ -331,10 +331,10 @@ export class AppService {
   /**
    * Update checked reports for a specific company by parsing notes from column AU
    */
-  async updateCheckedReports(companyName: string): Promise<any> {
+  async updateCheckedReports(companyName: string, fromRow: number = 5521): Promise<any> {
     try {
-      this.logger.log(`Updating checked reports for company: ${companyName}`);
-      const result = await this.companyService.updateCheckedReports(companyName);
+      this.logger.log(`Updating checked reports for company: ${companyName} from row ${fromRow}`);
+      const result = await this.companyService.updateCheckedReports(companyName, fromRow);
       
       if (result.success) {
         this.logger.log(`Successfully updated ${result.updatedCount} emission values for ${companyName}`);
@@ -356,11 +356,11 @@ export class AppService {
   /**
    * Update checked reports for all companies that have unchecked reports
    */
-  async updateAllCheckedReports(): Promise<any> {
+  async updateAllCheckedReports(fromRow: number = 5521): Promise<any> {
     try {
-      this.logger.log('Starting bulk update of all checked reports');
+      this.logger.log(`Starting bulk update of all checked reports from row ${fromRow}`);
       
-      const companiesWithUncheckedReports = await this.companyService.getCompaniesWithUncheckedReports();
+      const companiesWithUncheckedReports = await this.companyService.getCompaniesWithUncheckedReports(fromRow);
       
       if (companiesWithUncheckedReports.length === 0) {
         this.logger.log('No companies with unchecked reports found');
@@ -387,7 +387,7 @@ export class AppService {
         
         const batchPromises = batch.map(async (company) => {
           try {
-            const result = await this.companyService.updateCheckedReports(company.name);
+            const result = await this.companyService.updateCheckedReports(company.name, fromRow);
             
             if (result.success) {
               successfulUpdates++;

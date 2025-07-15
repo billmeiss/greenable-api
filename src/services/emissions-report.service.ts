@@ -105,7 +105,7 @@ export class EmissionsReportService {
         12. End-of-life treatment of sold products
         13. Downstream leased assets
         14. Franchises
-        15. Investments
+        15. Investments (Note that this should include financed emissions for scope 1,2,3)
 
         You must convert all values to the standard unit of tons of CO2 equivalent.
     `;
@@ -221,6 +221,7 @@ export class EmissionsReportService {
         A part of a fund is not a portfolio company.
         A regional branch is not a portfolio company.
         If a company has portfolio companies, make sure you still return the main company's / group's emissions data.
+        If a company is a group, you must return the emissions data for the group and emit portfolio companies.
 
         If a value is only provided for Scope 1&2 total, you must check if Scope 1 is included in the calculations.
         If a value is only provided for Scope 1&2 total, you must check if Scope 2 is included in the calculations.
@@ -365,7 +366,7 @@ export class EmissionsReportService {
         12. End-of-life treatment of sold products
         13. Downstream leased assets
         14. Franchises
-        15. Investments (Look for the absolute emissions value of investments/loans)
+        15. Investments (Look for the absolute emissions value of investments/loans, and the financed emissions for scope 1,2,3)
         
         For each category, determine:
         - The precise emissions value (if provided)

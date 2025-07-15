@@ -77,13 +77,24 @@ export class AppController {
   }
 
   @Post('/update-checked-reports/:companyName')
-  updateCheckedReports(@Param('companyName') companyName: string) {
-    return this.appService.updateCheckedReports(companyName);
+  updateCheckedReports(
+    @Param('companyName') companyName: string,
+    @Body() body?: { fromRow?: number }
+  ) {
+    const fromRow = body?.fromRow || 5521; // Default to 5521, but allow override
+    return this.appService.updateCheckedReports(companyName, fromRow);
   }
 
   @Post('/update-all-checked-reports')
-  updateAllCheckedReports() {
-    return this.appService.updateAllCheckedReports();
+  updateAllCheckedReports(@Body() body?: { fromRow?: number }) {
+    const fromRow = body?.fromRow || 5521; // Default to 5521, but allow override
+    return this.appService.updateAllCheckedReports(fromRow);
+  }
+
+  @Get('/companies-with-unchecked-reports')
+  getCompaniesWithUncheckedReports(@Query('fromRow') fromRow?: string) {
+    const startRow = fromRow ? parseInt(fromRow) : 5521; // Default to 5521, but allow override via query param
+    return this.appService.getCompaniesWithUncheckedReports(startRow);
   }
 
   @Post('/classify-company-type')
