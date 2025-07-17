@@ -655,7 +655,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Use the SheetsApiService with built-in exponential backoff
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow || 2}:AR`
+        `'Analysed Data'!A${fromRow || 2}:AR5500`
       );
       
       const rows = data.values || [];
@@ -1794,7 +1794,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     if (incorrectEmissions && incorrectEmissions.length > 0) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AW${companyIndex + 2}:AX${companyIndex + 2}`,
+        `Analysed Data!AY${companyIndex + 2}:AZ${companyIndex + 2}`,
         [[incorrectEmissions.map(emission => `${emission.companyName} - ${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason} --- ${emission.confidence})`).join('\n'), 'Not checked or updated']]
       );
     }
