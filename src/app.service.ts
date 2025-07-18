@@ -181,7 +181,7 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5501, toRow: 10710 });
     for (const company of companies) {
       const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl } = company;
       // if (revenueAmount && exchangeRateCountry !== 'USD') {
@@ -195,10 +195,10 @@ export class AppService {
       //   }
       //   continue;
       // }
-      // // Check if the revenue source is not Financial Modeling Prep or Vertex AI
-      // if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
-      //   continue;
-      // }
+      // Check if the revenue source is not Financial Modeling Prep or Vertex AI
+      if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
+        continue;
+      }
 
       // if (revenueAmount) {
       //         // Check if the existing revenue source returns a 404

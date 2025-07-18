@@ -806,14 +806,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
   }
 
-  async getExistingCompaniesFromSheet({ fromRow }: { fromRow?: number } = {}): Promise<any[]> {
+  async getExistingCompaniesFromSheet({ fromRow, toRow }: { fromRow?: number, toRow?: number } = {}): Promise<any[]> {
     try {
       console.log(`[STEP] Fetching data from 'Analysed Data' sheet`);
       
       // Use the SheetsApiService with built-in exponential backoff
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow || 2}:AR5500`
+        `'Analysed Data'!A${fromRow || 2}:AR${toRow || 5500}`
       );
       
       const rows = data.values || [];
@@ -1490,7 +1490,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         revenue,
         revenueCurrency,
         revenueSourceUrl,
-        emissionsUnit,
+        revenueData?.employeeCount,
         scope1Value,
         scope2LocationValue,
         scope2MarketValue,
@@ -1561,7 +1561,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Update the source url
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AL${companyIndex + 2}`,
+        `Analysed Data!AH${companyIndex + 2}`,
         [['Annual Report', revenueData.sourceUrl]]
       );
 
