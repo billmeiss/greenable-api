@@ -144,7 +144,7 @@ export class EmissionsReportService {
         12. End-of-life treatment of sold products
         13. Downstream leased assets
         14. Franchises
-        15. Investments (Note that this should include financed emissions for scope 1,2 & 3)
+        15. Investments (Note that this should include financed emissions for scope 1,2 & 3 and an investments scope 1 2 & 3 all get mapped to scope 3 category 15)
 
         You must convert all values to the standard unit of tons of CO2 equivalent.
     `;
