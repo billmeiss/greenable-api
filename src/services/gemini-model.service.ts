@@ -606,7 +606,7 @@ Extra-territorial organizations and bodies
           
     };
 
-    this.modelConfigs.revenueFromAnnualReport = {
+    this.modelConfigs.revenueAndEmployeeExtraction = {
       model: 'gemini-2.5-pro',
       generationConfig: {
         temperature: 0.0,
@@ -616,7 +616,9 @@ Extra-territorial organizations and bodies
             {
               "revenue": 0,
               "currency": "The currency of the revenue",
-              "year": "The year of the revenue"
+              "year": "The year of the revenue",
+              "employees": 0,
+              "year": "The year of the employees"
             }`
     }
 

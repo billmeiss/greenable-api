@@ -24,6 +24,7 @@ interface RevenueData {
   confidence: number;
   sourceUrl?: string;
   currency?: string;
+  employeeCount?: number;
 }
 
 interface CountryData {
@@ -407,115 +408,272 @@ export class CompanyService {
   }
 
   /**
+   * Extract revenue and employee count from a report URL
+   */
+  private async extractFinancialDataFromReport(
+    companyName: string, 
+    reportUrl: string, 
+    targetYear: string
+  ): Promise<RevenueData | null> {
+    try {
+      const prompt = this.buildFinancialDataExtractionPrompt(companyName, targetYear);
+      
+      const response = await this.geminiAiService.processUrl(
+        reportUrl, 
+        prompt, 
+        'revenueAndEmployeeExtraction'
+      );
+      
+      const parsedResponse = this.geminiApiService.safelyParseJson(response);
+      
+      if (!parsedResponse?.revenue) {
+        return null;
+      }
+      
+      return {
+        revenue: parsedResponse.revenue,
+        year: parsedResponse.year || targetYear,
+        source: this.determineReportSource(reportUrl),
+        confidence: parsedResponse.confidence || 8,
+        sourceUrl: reportUrl,
+        currency: parsedResponse.currency || 'USD',
+        employeeCount: parsedResponse.employeeCount || null
+      };
+    } catch (error) {
+      this.logger.error(`Error extracting financial data from report for ${companyName}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Build prompt for financial data extraction
+   */
+  private buildFinancialDataExtractionPrompt(companyName: string, targetYear: string): string {
+    return `
+      Extract financial information for ${companyName} from this document.
+      ${targetYear !== 'recent' ? `Focus on data for the year ${targetYear}.` : 'Use the most recent data available.'}
+      
+      IMPORTANT INSTRUCTIONS:
+      1. Find the total revenue/turnover for the company
+      2. Find the total number of employees (full-time equivalent if specified)
+      3. Revenue must be converted to a single $ value, not thousands or millions
+      4. Ensure data consistency by using the same reporting period for both metrics
+      
+      Return ONLY a JSON object in this exact format:
+      {
+        "revenue": 1234567890,
+        "currency": "USD",
+        "year": "2023",
+        "employeeCount": 50000,
+        "confidence": 9
+      }
+      
+      If employee count is not found, set employeeCount to null.
+      If revenue is not found, set revenue to null.
+      Confidence should be 1-10 based on data clarity and source reliability.
+    `;
+  }
+
+  /**
+   * Determine the source description based on report URL
+   */
+  private determineReportSource(reportUrl: string): string {
+    if (reportUrl.includes('annual')) {
+      return 'Annual Report';
+    }
+    if (reportUrl.includes('sustainability') || reportUrl.includes('esg')) {
+      return 'ESG/Sustainability Report';
+    }
+    return 'Company Report';
+  }
+
+  /**
+   * Get financial data from Gemini model as fallback
+   */
+  private async getFinancialDataFromGemini(
+    companyName: string, 
+    reportingPeriod?: string,
+    targetYear?: string
+  ): Promise<RevenueData | null> {
+    try {
+      const revenueModel = this.geminiModelService.getModel('revenue');
+      const prompt = this.buildGeminiFallbackPrompt(companyName, reportingPeriod, targetYear);
+      
+      const response = await this.geminiApiService.handleGeminiCall(
+        () => revenueModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        })
+      );
+      
+      const parsedResponse = this.geminiApiService.safelyParseJson(response.text);
+      
+      return {
+        revenue: parsedResponse.revenue,
+        year: targetYear || 'unknown',
+        source: 'Gemini Model',
+        confidence: parsedResponse.confidence || 5,
+        sourceUrl: null,
+        currency: parsedResponse.currency || 'USD',
+        employeeCount: parsedResponse.employeeCount || null
+      };
+    } catch (error) {
+      this.logger.error(`Error getting financial data from Gemini for ${companyName}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Build prompt for Gemini fallback
+   */
+  private buildGeminiFallbackPrompt(
+    companyName: string, 
+    reportingPeriod?: string, 
+    targetYear?: string
+  ): string {
+    return `
+      Find accurate financial information for ${companyName}
+      ${reportingPeriod ? ` for the reporting period: ${reportingPeriod}` : ''}
+      ${targetYear && targetYear !== 'recent' ? ` specifically for the year ${targetYear}` : ' for the most recent period'}.
+      
+      Please find:
+      1. Total revenue/turnover (convert to single $ value, not thousands/millions)
+      2. Total number of employees (full-time equivalent)
+      
+      Return JSON format:
+      {
+        "revenue": 1234567890,
+        "currency": "USD", 
+        "year": "2023",
+        "employeeCount": 50000,
+        "confidence": 7
+      }
+    `;
+  }
+
+  /**
+   * Create error response for revenue data
+   */
+  private createErrorRevenueResponse(
+    companyName: string, 
+    reportingPeriod?: string, 
+    annualReportUrl?: string
+  ): RevenueData {
+    const targetYear = reportingPeriod ? 
+      (this.extractYearFromPeriod(reportingPeriod)?.toString() || 'unknown') : 
+      'unknown';
+    
+    if (annualReportUrl) {
+      return {
+        revenue: null,
+        year: targetYear,
+        source: 'Annual Report (Error occurred during processing)',
+        confidence: 1,
+        sourceUrl: annualReportUrl,
+        currency: 'USD',
+        employeeCount: null
+      };
+    }
+    
+    return {
+      revenue: null,
+      year: targetYear,
+      source: 'Error occurred during retrieval',
+      confidence: 0,
+      currency: 'USD',
+      employeeCount: null
+    };
+  }
+
+  /**
    * Get company revenue data
    */
-  async getCompanyRevenue(companyName: string, reportingPeriod?: string): Promise<RevenueData | null> {
+  async getCompanyRevenue(companyName: string, reportingPeriod?: string, reportUrl?: string): Promise<RevenueData | null> {
     try {
       // Extract target year from reporting period if provided
-      let targetYear = 'recent';
-      if (reportingPeriod) {
-        const year = this.extractYearFromPeriod(reportingPeriod);
-        if (year) {
-          targetYear = year.toString();
-        }
-      }
+      const targetYear = this.extractTargetYear(reportingPeriod);
       
       // First try getting revenue data from Financial Modeling Prep API
       const fmpRevenueData = await this.getCompanyRevenueFromFMP(companyName, targetYear);
-      console.log(targetYear, fmpRevenueData);
-      if (fmpRevenueData && fmpRevenueData.year === targetYear) {
+      
+      if (this.isValidFmpData(fmpRevenueData, targetYear)) {
         this.logger.log(`Retrieved revenue data for ${companyName} from FMP API`);
         return fmpRevenueData;
       }
       
-      // If FMP data not found, fall back to Gemini
-      this.logger.log(`No revenue data found in FMP for ${companyName}, using Gemini fallback`);
-            
-      // Create user prompt with company and period information
-      const originalUserPrompt = `I need accurate financial information about ${companyName}${reportingPeriod ? ' specifically for the same period as their emissions report: ' + reportingPeriod : ' for the most recent period'}.${targetYear !== 'recent' ? ' Please focus on finding revenue data for the year ' + targetYear + '.' : ''}${reportingPeriod ? ' IMPORTANT: Please prioritize finding revenue data that matches the reporting period ' + reportingPeriod + ' to ensure data consistency with the emissions report.' : ''}`;
-      let userPrompt = originalUserPrompt;
-
-      
-      let result: RevenueData | null = null;
-
-      // Check if the company has an annual report
-      const annualReport = await this.searchForCompanyAnnualReport(companyName, targetYear);
-      if (annualReport) {
-        this.logger.log(`Found annual report for ${companyName}: ${annualReport}`);
-        userPrompt += `\n\nIMPORTANT: Please use the revenue data from the attached pdf to ensure data consistency with the emissions report. Only return the numerical value of the revenue. It must be in the specified JSON format. "revenue": 0, "currency": "The currency of the revenue", "year": "The year of the revenue". Revenue must be converted to single $ value, not thousands or millions.`;
-
-        const response = await this.geminiAiService.processUrl(annualReport, userPrompt, 'revenueFromAnnualReport');
-        console.log(response);
-        const parsedResponse = this.geminiApiService.safelyParseJson(response);
-        if (!parsedResponse.revenue) {
-          // Get Revenue directly from the model
-          const revenueModel = this.geminiModelService.getModel('revenue');
-          const response = await this.geminiApiService.handleGeminiCall(
-            () => revenueModel.generateContent({
-              contents: [{ role: 'user', parts: [{ text: originalUserPrompt }] }]
-            })
-          );
-          const parsedResponse = this.geminiApiService.safelyParseJson(response.text);
-        }
-        result = {
-          ...parsedResponse,
-          source: 'Annual Report',
-          sourceUrl: annualReport,
-          year: targetYear
-        }
-      } else {
-        // Get Revenue directly from the model
-        const revenueModel = this.geminiModelService.getModel('revenue');
-        const response = await this.geminiApiService.handleGeminiCall(
-          () => revenueModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: originalUserPrompt }] }]
-          })
-        );
-        const parsedResponse = this.geminiApiService.safelyParseJson(response.text);
-        result = {
-          ...parsedResponse,
-          source: 'Gemini Model',
-          sourceUrl: null,
-          currency: 'USD'
+      // If reportUrl is provided, extract financial data from it first
+      if (reportUrl) {
+        this.logger.log(`Extracting financial data from provided report URL for ${companyName}`);
+        const reportData = await this.extractFinancialDataFromReport(companyName, reportUrl, targetYear);
+        
+        if (reportData?.revenue) {
+          return reportData;
         }
       }
       
-      if (!result || !result) {
-        throw new Error('Failed to generate content from Gemini');
+      // Search for annual report if no reportUrl provided or extraction failed
+      if (!reportUrl) {
+        this.logger.log(`Searching for annual report for ${companyName}`);
+        const annualReportUrl = await this.searchForCompanyAnnualReport(companyName, targetYear);
+        
+        if (annualReportUrl) {
+          const reportData = await this.extractFinancialDataFromReport(companyName, annualReportUrl, targetYear);
+          
+          if (reportData?.revenue) {
+            return reportData;
+          }
+        }
       }
       
-      return result as RevenueData;
+      // Fall back to Gemini model
+      this.logger.log(`Using Gemini fallback for financial data for ${companyName}`);
+      return await this.getFinancialDataFromGemini(companyName, reportingPeriod, targetYear);
+      
     } catch (error) {
       this.logger.error(`Error getting revenue for ${companyName}: ${error.message}`);
+      return this.handleRevenueError(companyName, reportingPeriod, error);
+    }
+  }
+
+  /**
+   * Extract target year from reporting period
+   */
+  private extractTargetYear(reportingPeriod?: string): string {
+    if (!reportingPeriod) {
+      return 'recent';
+    }
+    
+    const year = this.extractYearFromPeriod(reportingPeriod);
+    return year ? year.toString() : 'recent';
+  }
+
+  /**
+   * Check if FMP data is valid for the target year
+   */
+  private isValidFmpData(fmpData: RevenueData | null, targetYear: string): boolean {
+    return fmpData !== null && 
+           (targetYear === 'recent' || fmpData.year === targetYear);
+  }
+
+  /**
+   * Handle revenue retrieval errors
+   */
+  private async handleRevenueError(
+    companyName: string, 
+    reportingPeriod?: string, 
+    error?: Error
+  ): Promise<RevenueData> {
+    try {
+      const targetYear = this.extractTargetYear(reportingPeriod);
+      const annualReportUrl = await this.searchForCompanyAnnualReport(companyName, targetYear);
       
-      // Capture the annual report URL if it was found before the error
-      try {
-        const targetYear = reportingPeriod ? (this.extractYearFromPeriod(reportingPeriod)?.toString() || 'recent') : 'recent';
-        const annualReport = await this.searchForCompanyAnnualReport(companyName, targetYear);
-        
-        if (annualReport) {
-          this.logger.log(`Despite error, found annual report for ${companyName}: ${annualReport}`);
-          return {
-            revenue: null,
-            year: targetYear,
-            source: 'Annual Report (Error occurred during processing)',
-            confidence: 1,
-            sourceUrl: annualReport,
-            currency: 'USD'
-          };
-        }
-      } catch (innerError) {
-        this.logger.error(`Error in error handler when getting annual report URL: ${innerError.message}`);
+      if (annualReportUrl) {
+        this.logger.log(`Despite error, found annual report for ${companyName}: ${annualReportUrl}`);
       }
       
-      // If no annual report was found or an error occurred while finding it, return a minimal valid object
-      return {
-        revenue: null,
-        year: reportingPeriod ? (this.extractYearFromPeriod(reportingPeriod)?.toString() || 'unknown') : 'unknown',
-        source: 'Error occurred during retrieval',
-        confidence: 0,
-        currency: 'USD'
-      };
+      return this.createErrorRevenueResponse(companyName, reportingPeriod, annualReportUrl);
+    } catch (innerError) {
+      this.logger.error(`Error in error handler: ${innerError.message}`);
+      return this.createErrorRevenueResponse(companyName, reportingPeriod);
     }
   }
 
@@ -1397,7 +1555,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
         `Analysed Data!F${companyIndex + 2}`,
-        [[revenueData.revenue, revenueData.currency]]
+        [[revenueData.revenue, revenueData.currency, revenueData.employeeCount]]
       );
 
       // Update the source url
@@ -1407,13 +1565,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         [['Annual Report', revenueData.sourceUrl]]
       );
 
-      if (revenueData.sourceUrl) {
-        await this.sheetsApiService.updateValues(
-          this.SPREADSHEET_ID,
-          `Analysed Data!AH${companyIndex + 2}`,
-          [['Annual Report', revenueData.sourceUrl]]
-        );
-      }
+      
 
       console.log(`[RESULT] Successfully updated revenue for ${company} in 'Analysed Data' sheet`);
       return true;

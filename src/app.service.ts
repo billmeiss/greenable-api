@@ -99,9 +99,9 @@ export class AppService {
     const existingCompanies = await this.companyService.getExistingCompaniesFromSheet();
 
     for (const company of existingCompanies) {
-      const { name, reportingPeriod, revenueYear } = company;
+      const { name, reportingPeriod, reportUrl } = company;
 
-      const revenueData = await this.companyService.getCompanyRevenue(name, reportingPeriod);
+      const revenueData = await this.companyService.getCompanyRevenue(name, reportingPeriod, reportUrl);
 
       if (revenueData) {
         await this.companyService.updateCompanyRevenue(name, revenueData);
@@ -181,38 +181,38 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5250 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500 });
     for (const company of companies) {
-      const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, newRevenueUrl, country, newRevenueCurrency, newRevenueAmount } = company;
-      if (revenueAmount && exchangeRateCountry !== 'USD') {
-        const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
-        if (exchangeRate) {
-          const updatedRevenue = revenueAmount / exchangeRate;
-          await this.companyService.updateNewRevenue(name, {
-            revenue: updatedRevenue,
-            currency: 'USD'
-          });
-        }
-        continue;
-      }
-      // Check if the revenue source is not Financial Modeling Prep or Vertex AI
-      if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
-        continue;
-      }
+      const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl } = company;
+      // if (revenueAmount && exchangeRateCountry !== 'USD') {
+      //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
+      //   if (exchangeRate) {
+      //     const updatedRevenue = revenueAmount / exchangeRate;
+      //     await this.companyService.updateNewRevenue(name, {
+      //       revenue: updatedRevenue,
+      //       currency: 'USD'
+      //     });
+      //   }
+      //   continue;
+      // }
+      // // Check if the revenue source is not Financial Modeling Prep or Vertex AI
+      // if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
+      //   continue;
+      // }
 
-      if (revenueAmount) {
-              // Check if the existing revenue source returns a 404
-      try {
-        const response = await axios.get(revenueUrl);
-        if (response.status === 200) continue;
-      } catch (error) {
-        console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
-      }
-      }
+      // if (revenueAmount) {
+      //         // Check if the existing revenue source returns a 404
+      // try {
+      //   const response = await axios.get(revenueUrl);
+      //   if (response.status === 200) continue;
+      // } catch (error) {
+      //   console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
+      // }
+      // }
 
 
       // Update the revenue source to the annual report
-      const revenue = await this.companyService.getCompanyRevenue(name, revenueYear);
+      const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl);
       console.log(revenue);
       if (!revenue || !revenue.revenue) {
         console.log(`[ERROR] No annual report found for ${name}`);
@@ -283,7 +283,7 @@ export class AppService {
   }
 
   async checkExistingReports(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 689 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 1585 });
     
     // Process companies in batches of 3
     const batchSize = 9;
