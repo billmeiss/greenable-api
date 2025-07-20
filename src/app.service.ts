@@ -181,7 +181,7 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5501, toRow: 10710 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5967, toRow: 10710 });
     for (const company of companies) {
       const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl } = company;
       // if (revenueAmount && exchangeRateCountry !== 'USD') {
