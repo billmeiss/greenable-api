@@ -181,72 +181,120 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5967, toRow: 10710 });
-    for (const company of companies) {
-      try {
-      const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl } = company;
-      // if (revenueAmount && exchangeRateCountry !== 'USD') {
-      //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
-      //   if (exchangeRate) {
-      //     const updatedRevenue = revenueAmount / exchangeRate;
-      //     await this.companyService.updateNewRevenue(name, {
-      //       revenue: updatedRevenue,
-      //       currency: 'USD'
-      //     });
-      //   }
-      //   continue;
-      // }
-      // Check if the revenue source is not Financial Modeling Prep or Vertex AI
-      if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
-        continue;
-      }
-
-      // if (revenueAmount) {
-      //         // Check if the existing revenue source returns a 404
-      // try {
-      //   const response = await axios.get(revenueUrl);
-      //   if (response.status === 200) continue;
-      // } catch (error) {
-      //   console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
-      // }
-      // }
-
-
-      // Update the revenue source to the annual report
-      const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl);
-      console.log(revenue);
-      if (!revenue || !revenue.revenue) {
-        console.log(`[ERROR] No annual report found for ${name}`);
-        await this.companyService.updateCompanyRevenue(name, {
-          revenue: null,
-          year: null,
-          source: null,
-          sourceUrl: revenue?.sourceUrl || 'Error occurred during retrieval',
-          confidence: 1,
-          currency: 'USD'
-        });
-        continue;
-      }
-      let updatedRevenue = revenue.revenue;
-      let updatedCurrency = revenue.currency;
-      if (revenue.currency !== 'USD') {
-        // Look up the exchange rate for the reporting period in rates.json
-        const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, revenue.currency);
-        if (exchangeRate) {
-          updatedRevenue = revenue.revenue / exchangeRate;
-          updatedCurrency = 'USD';
-        }
-      }
-      await this.companyService.updateCompanyRevenue(name, {
-        ...revenue,
-        revenue: updatedRevenue,
-        currency: updatedCurrency
-      });
-      } catch (error) {
-        console.log(`[ERROR] Failed to update inconsistent revenues: ${error.message}`);
-        continue;
-      }
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 7059, toRow: 10710 });
+    
+    if (companies.length === 0) {
+      this.logger.log('No companies found for revenue update');
+      return {
+        success: true,
+        message: 'No companies found for revenue update',
+        totalCompanies: 0,
+        successfulUpdates: 0,
+        failedUpdates: 0
+      };
     }
+    
+    this.logger.log(`Found ${companies.length} companies to update inconsistent revenues`);
+    
+    let successfulUpdates = 0;
+    let failedUpdates = 0;
+    
+    // Process companies in batches to avoid overwhelming the system
+    const batchSize = 8;
+    for (let i = 0; i < companies.length; i += batchSize) {
+      const batch = companies.slice(i, i + batchSize);
+      
+      const batchPromises = batch.map(async (company) => {
+        try {
+          const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl } = company;
+          
+          // if (revenueAmount && exchangeRateCountry !== 'USD') {
+          //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
+          //   if (exchangeRate) {
+          //     const updatedRevenue = revenueAmount / exchangeRate;
+          //     await this.companyService.updateNewRevenue(name, {
+          //       revenue: updatedRevenue,
+          //       currency: 'USD'
+          //     });
+          //   }
+          //   return;
+          // }
+          
+          // Check if the revenue source is not Financial Modeling Prep or Vertex AI
+          if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
+            return;
+          }
+
+          // if (revenueAmount) {
+          //         // Check if the existing revenue source returns a 404
+          // try {
+          //   const response = await axios.get(revenueUrl);
+          //   if (response.status === 200) return;
+          // } catch (error) {
+          //   console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
+          // }
+          // }
+
+          // Update the revenue source to the annual report
+          const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl);
+          console.log(revenue);
+          
+          if (!revenue || !revenue.revenue) {
+            console.log(`[ERROR] No annual report found for ${name}`);
+            await this.companyService.updateCompanyRevenue(name, {
+              revenue: null,
+              year: null,
+              source: null,
+              sourceUrl: revenue?.sourceUrl || 'Error occurred during retrieval',
+              confidence: 1,
+              currency: 'USD'
+            });
+            return;
+          }
+          
+          let updatedRevenue = revenue.revenue;
+          let updatedCurrency = revenue.currency;
+          
+          if (revenue.currency !== 'USD') {
+            // Look up the exchange rate for the reporting period in rates.json
+            const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, revenue.currency);
+            if (exchangeRate) {
+              updatedRevenue = revenue.revenue / exchangeRate;
+              updatedCurrency = 'USD';
+            }
+          }
+          
+          await this.companyService.updateCompanyRevenue(name, {
+            ...revenue,
+            revenue: updatedRevenue,
+            currency: updatedCurrency
+          });
+          
+          successfulUpdates++;
+          this.logger.log(`Successfully updated revenue for ${name}`);
+          
+        } catch (error) {
+          console.log(`[ERROR] Failed to update inconsistent revenues for ${company.name}: ${error.message}`);
+          failedUpdates++;
+        }
+      });
+      
+      // Wait for all companies in the current batch to complete
+      await Promise.all(batchPromises);
+      
+      this.logger.log(`Processed batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(companies.length / batchSize)} (companies ${i + 1}-${Math.min(i + batchSize, companies.length)})`);
+    }
+    
+    const summary = {
+      success: failedUpdates === 0,
+      message: `Processed ${companies.length} companies: ${successfulUpdates} successful, ${failedUpdates} failed`,
+      totalCompanies: companies.length,
+      successfulUpdates,
+      failedUpdates
+    };
+    
+    this.logger.log(summary.message);
+    return summary;
   }
 
   async checkIncompleteScopes(): Promise<any> {
