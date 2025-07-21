@@ -853,6 +853,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         scope3Mismatch: row[43]
       })).filter(Boolean);
 
+      console.log(companies.length);
+
       return companies;
     } catch (error) {
       console.log(`[ERROR] Error getting companies from sheet: ${error.message}`);
