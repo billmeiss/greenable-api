@@ -87,7 +87,7 @@ export class AppController {
 
   @Post('/update-all-checked-reports')
   updateAllCheckedReports(@Body() body?: { fromRow?: number }) {
-    const fromRow = body?.fromRow || 5521; // Default to 5521, but allow override
+    const fromRow = body?.fromRow || 2350; // Default to 5521, but allow override
     return this.appService.updateAllCheckedReports(fromRow);
   }
 

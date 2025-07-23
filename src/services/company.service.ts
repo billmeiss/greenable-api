@@ -2035,7 +2035,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
     for (const line of lines) {
       // Match pattern: scope3: null -> 7492 ------ (explanation)
-      const match = line.match(/^(\w+):\s*([^-]*?)\s*->\s*([^-]*?)\s*------\s*\((.*)\)$/);
+      const match = line.match(/^(?:[^-]+-\s*)?(\w+):\s*([^-]*?)\s*->\s*([^-]*?)\s*------\s*\((.*)\)$/);
       
       if (match) {
         const [, scope, oldValue, newValue, reason] = match;
@@ -2061,7 +2061,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Find the company row
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!A${fromRow}:AU`
+        `Analysed Data!A${fromRow}:AZ`
       );
 
       const rows = data.values || [];
@@ -2076,7 +2076,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const actualRowNumber = fromRow + companyIndex;
 
       // Get notes from column AU (index 46, 0-based)
-      const notes = rows[companyIndex][46]; // Column AU
+      const notes = rows[companyIndex][50]; // Column AY
       
       if (!notes) {
         console.log(`[INFO] No notes found in column AU for ${companyName}`);
@@ -2141,7 +2141,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       try {
         await this.sheetsApiService.updateValues(
           this.SPREADSHEET_ID,
-          `Analysed Data!AV${actualRowNumber}`,
+          `Analysed Data!AZ${actualRowNumber}`,
           [['Checked and Updated']]
         );
         console.log(`[SUCCESS] Marked ${companyName} as checked and updated`);
@@ -2177,7 +2177,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow}:AV`
+        `'Analysed Data'!A${fromRow}:AZ`
       );
       
       const rows = data.values || [];
@@ -2186,8 +2186,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const companyName = row[0];
-        const notes = row[46]; // Column AU (0-indexed as 46)
-        const processedFlag = row[47]; // Column AV (0-indexed as 47)
+        const notes = row[50]; // Column AY (0-indexed as 50)
+        const processedFlag = row[51]; // Column AZ (0-indexed as 51)
         
         // Check if company has notes in AU but hasn't been processed (AV is not "Checked and Updated")
         if (companyName && notes && 
