@@ -181,7 +181,7 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 8956, toRow: 10710 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 9584, toRow: 10710 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for revenue update');
