@@ -493,17 +493,23 @@ export class CompanyService {
   private async getFinancialDataFromGemini(
     companyName: string, 
     reportingPeriod?: string,
-    targetYear?: string
+    targetYear?: string,
+    companyCategory?: string,
+    country?: string
   ): Promise<RevenueData | null> {
     try {
       const revenueModel = this.geminiModelService.getModel('revenue');
-      const prompt = this.buildGeminiFallbackPrompt(companyName, reportingPeriod, targetYear);
+      const prompt = this.buildGeminiFallbackPrompt(companyName, reportingPeriod, targetYear, companyCategory, country);
+
+      console.log(prompt);
       
       const response = await this.geminiApiService.handleGeminiCall(
         () => revenueModel.generateContent({
           contents: [{ role: 'user', parts: [{ text: prompt }] }]
         })
       );
+
+      console.log(response.text);
       
       const parsedResponse = this.geminiApiService.safelyParseJson(response.text);
       
@@ -528,16 +534,22 @@ export class CompanyService {
   private buildGeminiFallbackPrompt(
     companyName: string, 
     reportingPeriod?: string, 
-    targetYear?: string
+    targetYear?: string,
+    companyCategory?: string,
+    country?: string
   ): string {
     return `
       Find accurate financial information for ${companyName}
       ${reportingPeriod ? ` for the reporting period: ${reportingPeriod}` : ''}
       ${targetYear && targetYear !== 'recent' ? ` specifically for the year ${targetYear}` : ' for the most recent period'}.
+      ${companyCategory ? ` The company is a ${companyCategory}.` : ''}
+      ${country ? ` The company is based in ${country}.` : ''}
       
       Please find:
       1. Total revenue/turnover (convert to single $ value, not thousands/millions)
       2. Total number of employees (full-time equivalent)
+
+      If you cannot find the revenue, use an estimate based on rocket reach, or other sources.
       
       Return JSON format:
       {
@@ -545,7 +557,8 @@ export class CompanyService {
         "currency": "USD", 
         "year": "2023",
         "employeeCount": 50000,
-        "confidence": 7
+        "confidence": 7,
+        "source": "Rocket Reach"
       }
     `;
   }
@@ -587,7 +600,7 @@ export class CompanyService {
   /**
    * Get company revenue data
    */
-  async getCompanyRevenue(companyName: string, reportingPeriod?: string, reportUrl?: string): Promise<RevenueData | null> {
+  async getCompanyRevenue(companyName: string, reportingPeriod?: string, reportUrl?: string, companyCategory?: string, country?: string): Promise<RevenueData | null> {
     try {
       // Extract target year from reporting period if provided
       const targetYear = this.extractTargetYear(reportingPeriod);
@@ -601,32 +614,32 @@ export class CompanyService {
       }
       
       // If reportUrl is provided, extract financial data from it first
-      if (reportUrl) {
-        this.logger.log(`Extracting financial data from provided report URL for ${companyName}`);
-        const reportData = await this.extractFinancialDataFromReport(companyName, reportUrl, targetYear);
+      // if (reportUrl) {
+      //   this.logger.log(`Extracting financial data from provided report URL for ${companyName}`);
+      //   const reportData = await this.extractFinancialDataFromReport(companyName, reportUrl, targetYear);
         
-        if (reportData?.revenue) {
-          return reportData;
-        }
-      }
+      //   if (reportData?.revenue) {
+      //     return reportData;
+      //   }
+      // }
       
-      // Search for annual report if no reportUrl provided or extraction failed
-      if (!reportUrl) {
-        this.logger.log(`Searching for annual report for ${companyName}`);
-        const annualReportUrl = await this.searchForCompanyAnnualReport(companyName, targetYear);
+      // // Search for annual report if no reportUrl provided or extraction failed
+      // if (!reportUrl) {
+      //   this.logger.log(`Searching for annual report for ${companyName}`);
+      //   const annualReportUrl = await this.searchForCompanyAnnualReport(companyName, targetYear);
         
-        if (annualReportUrl) {
-          const reportData = await this.extractFinancialDataFromReport(companyName, annualReportUrl, targetYear);
+      //   if (annualReportUrl) {
+      //     const reportData = await this.extractFinancialDataFromReport(companyName, annualReportUrl, targetYear);
           
-          if (reportData?.revenue) {
-            return reportData;
-          }
-        }
-      }
+      //     if (reportData?.revenue) {
+      //       return reportData;
+      //     }
+      //   }
+      // }
       
       // Fall back to Gemini model
       this.logger.log(`Using Gemini fallback for financial data for ${companyName}`);
-      return await this.getFinancialDataFromGemini(companyName, reportingPeriod, targetYear);
+      return await this.getFinancialDataFromGemini(companyName, reportingPeriod, targetYear, companyCategory, country);
       
     } catch (error) {
       this.logger.error(`Error getting revenue for ${companyName}: ${error.message}`);
@@ -843,6 +856,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         scope3Cat13: row[25],
         scope3Cat14: row[26],
         scope3Cat15: row[27],
+        country: row[29],
         category: row[30],
         revenueSource: row[33],
         revenueUrl: row[34],

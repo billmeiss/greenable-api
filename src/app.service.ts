@@ -181,7 +181,7 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 10608, toRow: 10710 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500, toRow: 10710 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for revenue update');
@@ -206,7 +206,7 @@ export class AppService {
       
       const batchPromises = batch.map(async (company) => {
         try {
-          const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl } = company;
+          const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl, category, country } = company;
           
           // if (revenueAmount && exchangeRateCountry !== 'USD') {
           //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
@@ -225,6 +225,10 @@ export class AppService {
             return;
           }
 
+          if (Boolean(revenueAmount)) {
+            return;
+          }
+
           // if (revenueAmount) {
           //         // Check if the existing revenue source returns a 404
           // try {
@@ -236,7 +240,7 @@ export class AppService {
           // }
 
           // Update the revenue source to the annual report
-          const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl);
+          const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl, category, country);
           console.log(revenue);
           
           if (!revenue || !revenue.revenue) {
