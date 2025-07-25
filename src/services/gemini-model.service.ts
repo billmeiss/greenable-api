@@ -622,6 +622,18 @@ Extra-territorial organizations and bodies
             }`
     }
 
+    this.modelConfigs.missingEmployees = {
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        temperature: 0.0,
+        responseMimeType: 'application/json',
+      },
+      systemInstruction: `You will return responses in this JSON format:
+            {
+              "employees": 0,
+            }`
+    }
+
     // Revenue model
     this.modelConfigs.revenue = {
       model: 'gemini-2.5-pro',

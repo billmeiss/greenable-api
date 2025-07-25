@@ -180,8 +180,76 @@ export class AppService {
     }
   }
 
+  async updateMissingEmployees(): Promise<any> {
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 5500 });
+    
+    if (companies.length === 0) {
+      this.logger.log('No companies found for employee count update');
+      return {
+        success: true,
+        message: 'No companies found for employee count update',
+        totalCompanies: 0,
+        successfulUpdates: 0,
+        failedUpdates: 0
+      };
+    }
+    
+    this.logger.log(`Found ${companies.length} companies to update missing employees`);
+    
+    let successfulUpdates = 0;
+    let failedUpdates = 0;
+    
+    // Process companies in batches to avoid overwhelming the system
+    const batchSize = 5;
+    for (let i = 0; i < companies.length; i += batchSize) {
+      const batch = companies.slice(i, i + batchSize);
+      
+      const batchPromises = batch.map(async (company) => {
+        try {
+          const { name, reportUrl, reportingPeriod } = company;
+          let result = await this.companyService.checkReportUrlForMissingEmployees(name, reportUrl, reportingPeriod);
+          console.log(result);
+          
+          if (!result?.employeeCount) {
+            // Search for the annual report if employee count not found
+            const annualReportUrl = await this.companyService.searchForCompanyAnnualReport(name, reportingPeriod);
+            if (annualReportUrl) {
+              const annualReportData = await this.companyService.checkReportUrlForMissingEmployees(name, annualReportUrl, reportingPeriod);
+              result = annualReportData;
+            }
+          }
+          
+          await this.companyService.updateMissingEmployees(name, result.employeeCount, company);
+          successfulUpdates++;
+          this.logger.log(`Successfully updated employee count for ${name}`);
+          
+        } catch (error) {
+          console.log(`[ERROR] Failed to update missing employees for ${company.name}: ${error.message}`);
+          failedUpdates++;
+        }
+      });
+      
+      // Wait for all companies in the current batch to complete
+      await Promise.all(batchPromises);
+      
+      this.logger.log(`Processed batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(companies.length / batchSize)} (companies ${i + 1}-${Math.min(i + batchSize, companies.length)})`);
+    }
+    
+    const summary = {
+      success: failedUpdates === 0,
+      message: `Processed ${companies.length} companies: ${successfulUpdates} successful, ${failedUpdates} failed`,
+      totalCompanies: companies.length,
+      successfulUpdates,
+      failedUpdates
+    };
+    
+    this.logger.log(summary.message);
+    return summary;
+  }
+
   async updateInconsistentRevenues(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500, toRow: 10710 });
+    const allCompanies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500, toRow: 10710 });
+    let companies = allCompanies;
     
     if (companies.length === 0) {
       this.logger.log('No companies found for revenue update');
@@ -193,6 +261,11 @@ export class AppService {
         failedUpdates: 0
       };
     }
+
+    //filter out companies with revenue amount
+    companies = companies.filter(company => company.revenue === null || company.revenue === undefined || company.revenue === '0' || company.revenue === 0 || company.revenue === '');
+
+    console.log(companies.length);
     
     this.logger.log(`Found ${companies.length} companies to update inconsistent revenues`);
     
@@ -225,9 +298,9 @@ export class AppService {
             return;
           }
 
-          if (Boolean(revenueAmount)) {
-            return;
-          }
+          // if (Boolean(revenueAmount) && revenueAmount !== 0 && revenueAmount !== null && revenueAmount !== undefined && revenueAmount !== '0') {
+          //   return;
+          // }
 
           // if (revenueAmount) {
           //         // Check if the existing revenue source returns a 404

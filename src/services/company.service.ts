@@ -445,6 +445,51 @@ export class CompanyService {
     }
   }
 
+  async updateMissingEmployees(companyName: string, employeeCount: number, company: any): Promise<any> {
+         // Find the row index of the company in the 'Analysed Data' sheet
+         const data = await this.sheetsApiService.getValues(
+          this.SPREADSHEET_ID,
+          `Analysed Data!A2:A`
+        );
+
+        const rows = data.values || [];
+        const companyIndex = rows.findIndex(row => row[0] === companyName);
+
+        if (companyIndex === -1) {
+          console.log(`[ERROR] Company ${companyName} not found in 'Analysed Data' sheet`);
+          return;
+        }
+
+        // Calculate the actual row number in the sheet
+        const actualRowNumber = 2 + companyIndex;
+
+        // Update the employee count in column E
+        await this.sheetsApiService.updateValues(
+          this.SPREADSHEET_ID,
+          `Analysed Data!H${actualRowNumber}`,
+          [[employeeCount]]
+        );
+
+        console.log(`[SUCCESS] Updated employee count for ${companyName} to ${employeeCount}`);
+      
+  }
+
+  async checkReportUrlForMissingEmployees(companyName: string, reportUrl: string, targetYear: string): Promise<any> {
+    const prompt = `
+      I need you to find how many employees the company ${companyName} has in ${targetYear}.
+      If the report contains a number of employees, return the number of employees.
+      If the report does not contain a number of employees, return null.
+      The response should be in the following JSON format:
+      {
+        "employeeCount": 1234567890
+      }
+    `;
+
+    const response = await this.geminiAiService.processUrl(reportUrl, prompt, 'missingEmployees');
+    const parsedResponse = this.geminiApiService.safelyParseJson(response);
+    return parsedResponse;
+  }
+
   /**
    * Build prompt for financial data extraction
    */
@@ -613,29 +658,28 @@ export class CompanyService {
         return fmpRevenueData;
       }
       
-      // If reportUrl is provided, extract financial data from it first
-      // if (reportUrl) {
-      //   this.logger.log(`Extracting financial data from provided report URL for ${companyName}`);
-      //   const reportData = await this.extractFinancialDataFromReport(companyName, reportUrl, targetYear);
+      if (reportUrl) {
+        this.logger.log(`Extracting financial data from provided report URL for ${companyName}`);
+        const reportData = await this.extractFinancialDataFromReport(companyName, reportUrl, targetYear);
         
-      //   if (reportData?.revenue) {
-      //     return reportData;
-      //   }
-      // }
+        if (reportData?.revenue) {
+          return reportData;
+        }
+      }
       
-      // // Search for annual report if no reportUrl provided or extraction failed
-      // if (!reportUrl) {
-      //   this.logger.log(`Searching for annual report for ${companyName}`);
-      //   const annualReportUrl = await this.searchForCompanyAnnualReport(companyName, targetYear);
+      // Search for annual report if no reportUrl provided or extraction failed
+      if (!reportUrl) {
+        this.logger.log(`Searching for annual report for ${companyName}`);
+        const annualReportUrl = await this.searchForCompanyAnnualReport(companyName, targetYear);
         
-      //   if (annualReportUrl) {
-      //     const reportData = await this.extractFinancialDataFromReport(companyName, annualReportUrl, targetYear);
+        if (annualReportUrl) {
+          const reportData = await this.extractFinancialDataFromReport(companyName, annualReportUrl, targetYear);
           
-      //     if (reportData?.revenue) {
-      //       return reportData;
-      //     }
-      //   }
-      // }
+          if (reportData?.revenue) {
+            return reportData;
+          }
+        }
+      }
       
       // Fall back to Gemini model
       this.logger.log(`Using Gemini fallback for financial data for ${companyName}`);

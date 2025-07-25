@@ -61,6 +61,11 @@ export class AppController {
     return this.appService.updateInconsistentRevenues();
   }
 
+  @Post('/update-missing-employees')
+  updateMissingEmployees() {
+    return this.appService.updateMissingEmployees();
+  }
+
   @Post('/check-incomplete-scopes')
   checkIncompleteScopes() {
     return this.appService.checkIncompleteScopes();
