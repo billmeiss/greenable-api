@@ -487,6 +487,7 @@ export class CompanyService {
 
     const response = await this.geminiAiService.processUrl(reportUrl, prompt, 'missingEmployees');
     const parsedResponse = this.geminiApiService.safelyParseJson(response);
+    
     return parsedResponse;
   }
 
@@ -1908,6 +1909,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         If a category is part of the scope 3 total but their absolute value is not provided, set the value to Not Specified.
         If a category is not part of the scope 3 total, set the value to null.
         Please check each individual scope 3 value and the sum, since I've already determined that there's a mismatch. Make sure the total sum was not hallucinated or that the individual scope 3 categories were not extracted incorrectly.
+        If the sum of the scope 3 values is not equal to the scope 3 total, set the scope 3 total to the sum of the scope 3 values.
         Your response should be a JSON object with the following fields:
         {
           "isCorrect": true,
@@ -1938,7 +1940,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     return parsedResponse;
   }
 
-  async updateScope3(company: string, reason: string, scope3Values: any): Promise<boolean> {
+  async updateScope3(company: string, reason: string, scope3Values: any, isCorrect: boolean): Promise<boolean> {
     try {
       console.log(`[STEP] Updating scope3 for ${company} in 'Analysed Data' sheet`);
       const data = await this.sheetsApiService.getValues(
@@ -1960,6 +1962,15 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       }
 
       console.log(scope3Values, companyIndex);
+      
+
+      if (isCorrect) {
+        return await this.sheetsApiService.updateValues(
+          this.SPREADSHEET_ID,
+          `Analysed Data!AS${companyIndex + 2}`,
+          [['Original is Correct']]
+        );
+      }
 
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
@@ -2272,5 +2283,127 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       console.log(error);
       return [];
     }
+  }
+
+  /**
+   * Clean "Not specified" values from scope3 categories (columns N:AB) 
+   * when column AP contains "no" value
+   */
+  async cleanNotSpecifiedValuesFromNoRows(): Promise<{
+    success: boolean,
+    totalRowsProcessed: number,
+    totalCellsCleaned: number,
+    errors: string[]
+  }> {
+    try {
+      console.log(`[STEP] Starting cleanup of "Not specified" values from rows with "no" in column AP`);
+      
+      // Get data including column AP (index 41)
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `'Analysed Data'!A2:AP`
+      );
+      
+      const rows = data.values || [];
+      const errors = [];
+      let totalRowsProcessed = 0;
+      let totalCellsCleaned = 0;
+      
+      console.log(`[DETAIL] Found ${rows.length} rows to process`);
+      
+      // Get scope column mapping for N:AB (indices 13-27)
+      const scopeColumnMapping = this.getScopeColumnMapping();
+      const scope3CategoryColumns = [
+        'scope3Cat1', 'scope3Cat2', 'scope3Cat3', 'scope3Cat4', 'scope3Cat5',
+        'scope3Cat6', 'scope3Cat7', 'scope3Cat8', 'scope3Cat9', 'scope3Cat10',
+        'scope3Cat11', 'scope3Cat12', 'scope3Cat13', 'scope3Cat14', 'scope3Cat15'
+      ];
+      
+      for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+        const row = rows[rowIndex];
+        const actualRowNumber = rowIndex + 2; // Adjust for starting at row 2
+        const columnAPValue = row[41]; // Column AP (0-based index 41)
+        
+        // Check if column AP contains "no" (case insensitive)
+        if (columnAPValue && typeof columnAPValue === 'string' && 
+            columnAPValue.toLowerCase().trim() === 'no') {
+          
+          console.log(`[DETAIL] Found "no" in column AP for row ${actualRowNumber}, company: ${row[0] || 'Unknown'}`);
+          totalRowsProcessed++;
+          
+          // Check columns N:AB (indices 13-27) for "Not specified" values
+          for (const scopeColumn of scope3CategoryColumns) {
+            const columnIndex = this.getScopeColumnIndex(scopeColumn);
+            const cellValue = row[columnIndex];
+            
+            if (cellValue && typeof cellValue === 'string' && 
+                cellValue.toLowerCase().includes('not specified')) {
+              
+              try {
+                const columnLetter = scopeColumnMapping[scopeColumn];
+                console.log(`[DETAIL] Clearing "Not specified" value in ${columnLetter}${actualRowNumber}: "${cellValue}"`);
+                
+                // Clear the cell by setting it to empty string
+                await this.sheetsApiService.updateValues(
+                  this.SPREADSHEET_ID,
+                  `Analysed Data!${columnLetter}${actualRowNumber}`,
+                  [['']]
+                );
+                
+                totalCellsCleaned++;
+                console.log(`[SUCCESS] Cleared cell ${columnLetter}${actualRowNumber}`);
+                
+              } catch (updateError) {
+                const errorMsg = `Failed to clear cell ${scopeColumn} in row ${actualRowNumber}: ${updateError.message}`;
+                console.log(`[ERROR] ${errorMsg}`);
+                errors.push(errorMsg);
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`[RESULT] Cleanup completed. Processed ${totalRowsProcessed} rows with "no" in column AP, cleaned ${totalCellsCleaned} cells`);
+      
+      return {
+        success: errors.length === 0,
+        totalRowsProcessed,
+        totalCellsCleaned,
+        errors
+      };
+      
+    } catch (error) {
+      console.log(`[ERROR] Error in cleanNotSpecifiedValuesFromNoRows: ${error.message}`);
+      return {
+        success: false,
+        totalRowsProcessed: 0,
+        totalCellsCleaned: 0,
+        errors: [error.message]
+      };
+    }
+  }
+
+  /**
+   * Helper method to get column index for a scope category
+   */
+  private getScopeColumnIndex(scopeColumn: string): number {
+    const columnMapping = {
+      'scope3Cat1': 13,
+      'scope3Cat2': 14,
+      'scope3Cat3': 15,
+      'scope3Cat4': 16,
+      'scope3Cat5': 17,
+      'scope3Cat6': 18,
+      'scope3Cat7': 19,
+      'scope3Cat8': 20,
+      'scope3Cat9': 21,
+      'scope3Cat10': 22,
+      'scope3Cat11': 23,
+      'scope3Cat12': 24,
+      'scope3Cat13': 25,
+      'scope3Cat14': 26,
+      'scope3Cat15': 27
+    };
+    return columnMapping[scopeColumn] || -1;
   }
 }

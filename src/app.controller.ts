@@ -71,6 +71,8 @@ export class AppController {
     return this.appService.checkIncompleteScopes();
   }  
 
+  
+
   @Post('/check-existing-reports')
   checkExistingReports() {
     return this.appService.checkExistingReports();
@@ -105,5 +107,10 @@ export class AppController {
   @Post('/classify-company-type')
   classifyCompanyType() {
     return this.appService.classifyCompanyType();
+  }
+
+  @Post('/clean-not-specified-values')
+  cleanNotSpecifiedValues() {
+    return this.appService.cleanNotSpecifiedValuesFromNoRows();
   }
 }

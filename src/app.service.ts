@@ -181,7 +181,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 5500 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 487, toRow: 5500 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
@@ -375,7 +375,7 @@ export class AppService {
   }
 
   async checkIncompleteScopes(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5371 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 1534, toRow: 10685 });
     for (const company of companies) {
       try {
       const { name, reportUrl, scope3, scope3Cat1, scope3Cat2, scope3Cat3, scope3Cat4, scope3Cat5, scope3Cat6, scope3Cat7, scope3Cat8, scope3Cat9, scope3Cat10, scope3Cat11, scope3Cat12, scope3Cat13, scope3Cat14, scope3Cat15, scope3Mismatch } = company;
@@ -402,9 +402,7 @@ export class AppService {
       });
 
       console.log(scope3Values);
-      if (!scope3Values.isCorrect) {
-        await this.companyService.updateScope3(name, scope3Values.reason, scope3Values?.scope3Values);
-      }
+        await this.companyService.updateScope3(name, scope3Values.reason, scope3Values?.scope3Values, scope3Values?.isCorrect);
       } catch (error) {
         console.log(`[ERROR] Failed to check incomplete revenues: ${error.message}`);
         continue;
@@ -641,6 +639,27 @@ export class AppService {
     
     this.logger.log(summary.message);
     return summary;
+  }
+
+  /**
+   * Clean "Not specified" values from scope3 categories when column AP contains "no"
+   */
+  async cleanNotSpecifiedValuesFromNoRows(): Promise<any> {
+    try {
+      this.logger.log('Starting cleanup of "Not specified" values from rows with "no" in column AP');
+      const result = await this.companyService.cleanNotSpecifiedValuesFromNoRows();
+      
+      this.logger.log(`Cleanup completed successfully. Processed ${result.totalRowsProcessed} rows, cleaned ${result.totalCellsCleaned} cells`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in cleaning not specified values: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        totalRowsProcessed: 0,
+        totalCellsCleaned: 0
+      };
+    }
   }
 }
 
