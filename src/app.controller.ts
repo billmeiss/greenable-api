@@ -113,4 +113,11 @@ export class AppController {
   cleanNotSpecifiedValues() {
     return this.appService.cleanNotSpecifiedValuesFromNoRows();
   }
+
+  @Get('/average-emissions-by-industry')
+  getAverageEmissionsByIndustry() {
+    return this.appService.calculateAverageEmissionsByIndustry();
+  }
+
+  
 }

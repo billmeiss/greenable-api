@@ -9,6 +9,7 @@ import { readFile } from 'fs/promises';
 import { GeminiAiService } from './gemini-ai.service';
 import { SearchService } from './search.service';
 import { EmissionsReportService } from './emissions-report.service';
+import { CATEGORY_SCHEMA } from '../constants';
 
 // Add type definition for Gemini API response
 interface GeminiResponse {
@@ -806,12 +807,12 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   /**
    * Get company category
    */
-  async getCompanyCategory(companyName: string): Promise<string | null> {
+  async getCompanyCategory(companyName: string, country?: string, reportUrl?: string): Promise<string | null> {
     const companyCategoryModel = this.geminiModelService.getModel('companyCategory');
 
     const result = await this.geminiApiService.handleGeminiCall(
       () => companyCategoryModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: `I need to find the category of ${companyName}. Please return the most appropriate category possible in the JSON format. If the comony is Other business services, return Other business services - {The type of service provided by the company}. Do not provide any additional text.` }] }],
+        contents: [{ role: 'user', parts: [{ text: `I need to find the category of ${companyName} in ${country} with the sustainability report ${reportUrl}. Please return the most appropriate category possible in the JSON format. Do not provide any additional text.` }] }],
       })
     );
 
@@ -2405,5 +2406,385 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       'scope3Cat15': 27
     };
     return columnMapping[scopeColumn] || -1;
+  }
+
+  /**
+   * Calculate average emissions per dollar for every GHG emission category by industry
+   * Only uses companies with complete quantitative data and removes outliers
+   */
+  async calculateAverageEmissionsByIndustry(): Promise<any> {
+    try {
+      this.logger.log('Fetching all companies from spreadsheet');
+      const allCompanies = await this.getExistingCompaniesFromSheet();
+      
+      this.logger.log(`Processing ${allCompanies.length} total companies`);
+      
+      // Filter companies with complete quantitative data across ALL categories
+      const companiesWithCompleteData = this.filterCompaniesWithCompleteDataAllCategories(allCompanies);
+      this.logger.log(`Found ${companiesWithCompleteData.length} companies with complete data across all categories`);
+      
+      // Group companies by industry category using CATEGORY_SCHEMA
+      const companiesByIndustry = this.groupCompaniesByIndustryFromSchema(companiesWithCompleteData);
+      
+      // Calculate averages for each industry with outlier removal
+      const industryAverages = this.calculateIndustryAveragesWithOutlierRemoval(companiesByIndustry);
+      
+      // Get list of all companies used in calculations
+      const companiesUsedInCalculations = this.getCompaniesUsedInCalculations(companiesByIndustry);
+      
+      return {
+        success: true,
+        totalCompaniesProcessed: allCompanies.length,
+        companiesWithCompleteData: companiesWithCompleteData.length,
+        industriesAnalyzed: Object.keys(industryAverages).length,
+        companiesUsedInCalculations: companiesUsedInCalculations,
+        industries: industryAverages,
+        metadata: {
+          ghgCategories: this.getGhgCategoryDefinitions(),
+          industryCategories: this.getValidIndustryCategories(),
+          calculationMethod: 'Average emissions per dollar (kg CO2e/USD) with outlier removal using IQR method',
+          dataCompleteness: 'Only companies with complete data across ALL GHG emission categories (Scope 1, 2, 3 total, and all 15 Scope 3 subcategories)',
+          outlierRemovalMethod: 'Interquartile Range (IQR) with 1.5x multiplier',
+          emissionsUnit: 'kg CO2e per USD (converted from tons CO2e to kg CO2e)'
+        }
+      };
+    } catch (error) {
+      this.logger.error(`Error calculating average emissions by industry: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Filter companies that have complete quantitative data across ALL GHG emission categories
+   * A company must have valid data for every single category to be included
+   */
+  private filterCompaniesWithCompleteDataAllCategories(companies: any[]): any[] {
+    return companies.filter(company => {
+      // Must have basic required data
+      const hasBasicData = company.name && company.category && company.revenue;
+      if (!hasBasicData) return false;
+      
+      // Must have valid revenue
+      const hasValidRevenue = this.isValidNumericValue(company.revenue);
+      if (!hasValidRevenue) return false;
+      
+      // Must have ALL scope emissions data
+      const requiredFields = [
+        'scope1',
+        'scope2Location',
+        'scope2Market', 
+        'scope3',
+        'scope3Cat1',
+        'scope3Cat2',
+        'scope3Cat3',
+        'scope3Cat4',
+        'scope3Cat5',
+        'scope3Cat6',
+        'scope3Cat7',
+        'scope3Cat8',
+        'scope3Cat9',
+        'scope3Cat10',
+        'scope3Cat11',
+        'scope3Cat12',
+        'scope3Cat13',
+        'scope3Cat14',
+        'scope3Cat15'
+      ];
+      
+      // Check if ALL required emission fields have valid data
+      const hasAllEmissionData = requiredFields.every(field => 
+        this.isValidNumericValue(company[field])
+      );
+      
+      // Must have a valid industry category from CATEGORY_SCHEMA
+      const hasValidIndustryCategory = this.isValidIndustryCategory(company.category);
+      
+      return hasAllEmissionData && hasValidIndustryCategory;
+    });
+  }
+
+  /**
+   * Check if the industry category is valid according to CATEGORY_SCHEMA
+   */
+  private isValidIndustryCategory(category: string): boolean {
+    return CATEGORY_SCHEMA.includes(category);
+  }
+
+  /**
+   * Group companies by their industry category using only valid CATEGORY_SCHEMA categories
+   */
+  private groupCompaniesByIndustryFromSchema(companies: any[]): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+    
+    companies.forEach(company => {
+      const industry = company.category;
+      
+      // Only group if the industry is in CATEGORY_SCHEMA
+      if (this.isValidIndustryCategory(industry)) {
+        if (!grouped[industry]) {
+          grouped[industry] = [];
+        }
+        grouped[industry].push(company);
+      }
+    });
+    
+    return grouped;
+  }
+
+  /**
+   * Get list of all companies used in calculations, organized by industry
+   */
+  private getCompaniesUsedInCalculations(companiesByIndustry: Record<string, any[]>): Record<string, any[]> {
+    const companiesUsed: Record<string, any[]> = {};
+    
+    Object.entries(companiesByIndustry).forEach(([industry, companies]) => {
+      if (companies.length >= 3) { // Only industries that have enough data for analysis
+        companiesUsed[industry] = companies.map(company => ({
+          name: company.name,
+          revenue: company.revenue,
+          reportingPeriod: company.reportingPeriod,
+          country: company.country,
+          scope1: company.scope1,
+          scope2Location: company.scope2Location,
+          scope2Market: company.scope2Market,
+          scope3: company.scope3,
+          scope3Categories: {
+            cat1: company.scope3Cat1,
+            cat2: company.scope3Cat2,
+            cat3: company.scope3Cat3,
+            cat4: company.scope3Cat4,
+            cat5: company.scope3Cat5,
+            cat6: company.scope3Cat6,
+            cat7: company.scope3Cat7,
+            cat8: company.scope3Cat8,
+            cat9: company.scope3Cat9,
+            cat10: company.scope3Cat10,
+            cat11: company.scope3Cat11,
+            cat12: company.scope3Cat12,
+            cat13: company.scope3Cat13,
+            cat14: company.scope3Cat14,
+            cat15: company.scope3Cat15
+          }
+        }));
+      }
+    });
+    
+    return companiesUsed;
+  }
+
+  /**
+   * Get valid industry categories from CATEGORY_SCHEMA
+   */
+  private getValidIndustryCategories(): string[] {
+    return [...CATEGORY_SCHEMA];
+  }
+
+  /**
+   * Check if a value is a valid numeric value for calculations
+   */
+  private isValidNumericValue(value: any): boolean {
+    if (typeof value === 'number' && !isNaN(value) && value > 0) {
+      return true;
+    }
+    if (typeof value === 'string') {
+      const numValue = parseFloat(value);
+      return !isNaN(numValue) && numValue > 0;
+    }
+    return false;
+  }
+
+  /**
+   * Calculate industry averages with outlier removal for each GHG category
+   */
+  private calculateIndustryAveragesWithOutlierRemoval(companiesByIndustry: Record<string, any[]>): Record<string, any> {
+    const results: Record<string, any> = {};
+    
+    Object.entries(companiesByIndustry).forEach(([industry, companies]) => {
+      if (companies.length < 3) {
+        // Skip industries with less than 3 companies (can't effectively remove outliers)
+        this.logger.warn(`Skipping industry '${industry}' - insufficient data (${companies.length} companies)`);
+        return;
+      }
+      
+      results[industry] = this.calculateIndustryAverages(companies);
+    });
+    
+    return results;
+  }
+
+  /**
+   * Calculate averages for a single industry across all GHG categories
+   */
+  private calculateIndustryAverages(companies: any[]): any {
+    const ghgCategories = this.getGhgCategoryMappings();
+    const averages: Record<string, any> = {};
+    
+    Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
+      const emissionsPerDollar = this.calculateEmissionsPerDollarForCategory(companies, fieldName);
+      const cleanedData = this.removeOutliers(emissionsPerDollar);
+      
+      if (cleanedData.length > 0) {
+        averages[categoryName] = {
+          averageEmissionsPerDollar: this.calculateMean(cleanedData),
+          companiesIncluded: cleanedData.length,
+          outlierCount: emissionsPerDollar.length - cleanedData.length,
+          standardDeviation: this.calculateStandardDeviation(cleanedData),
+          median: this.calculateMedian(cleanedData),
+          min: Math.min(...cleanedData),
+          max: Math.max(...cleanedData)
+        };
+      }
+    });
+    
+    return {
+      totalCompanies: companies.length,
+      categories: averages
+    };
+  }
+
+  /**
+   * Calculate emissions per dollar for a specific category
+   * Converts from tons CO2e to kg CO2e before calculating ratio
+   */
+  private calculateEmissionsPerDollarForCategory(companies: any[], fieldName: string): number[] {
+    return companies
+      .map(company => {
+        const emissionsInTons = this.parseNumericValue(company[fieldName]);
+        const revenue = this.parseNumericValue(company.revenue);
+        
+        if (emissionsInTons > 0 && revenue > 0) {
+          // Convert tons CO2e to kg CO2e (multiply by 1000)
+          const emissionsInKg = emissionsInTons * 1000;
+          return emissionsInKg / revenue;
+        }
+        return null;
+      })
+      .filter(value => value !== null) as number[];
+  }
+
+  /**
+   * Parse a value to a numeric type safely
+   */
+  private parseNumericValue(value: any): number {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  }
+
+  /**
+   * Remove outliers using the Interquartile Range (IQR) method
+   */
+  private removeOutliers(data: number[]): number[] {
+    if (data.length < 4) {
+      return data; // Can't calculate quartiles with less than 4 data points
+    }
+    
+    const sorted = [...data].sort((a, b) => a - b);
+    const q1Index = Math.floor(sorted.length * 0.25);
+    const q3Index = Math.floor(sorted.length * 0.75);
+    
+    const q1 = sorted[q1Index];
+    const q3 = sorted[q3Index];
+    const iqr = q3 - q1;
+    
+    const lowerBound = q1 - (1.5 * iqr);
+    const upperBound = q3 + (1.5 * iqr);
+    
+    return data.filter(value => value >= lowerBound && value <= upperBound);
+  }
+
+  /**
+   * Calculate the mean of an array of numbers
+   */
+  private calculateMean(data: number[]): number {
+    if (data.length === 0) return 0;
+    return data.reduce((sum, value) => sum + value, 0) / data.length;
+  }
+
+  /**
+   * Calculate the median of an array of numbers
+   */
+  private calculateMedian(data: number[]): number {
+    if (data.length === 0) return 0;
+    
+    const sorted = [...data].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    
+    if (sorted.length % 2 === 0) {
+      return (sorted[middle - 1] + sorted[middle]) / 2;
+    }
+    return sorted[middle];
+  }
+
+  /**
+   * Calculate the standard deviation of an array of numbers
+   */
+  private calculateStandardDeviation(data: number[]): number {
+    if (data.length <= 1) return 0;
+    
+    const mean = this.calculateMean(data);
+    const squaredDifferences = data.map(value => Math.pow(value - mean, 2));
+    const variance = this.calculateMean(squaredDifferences);
+    
+    return Math.sqrt(variance);
+  }
+
+  /**
+   * Get GHG category mappings to spreadsheet field names
+   */
+  private getGhgCategoryMappings(): Record<string, string> {
+    return {
+      'scope1': 'scope1',
+      'scope2_location': 'scope2Location',
+      'scope2_market': 'scope2Market',
+      'scope3_total': 'scope3',
+      'scope3_cat1_purchased_goods_services': 'scope3Cat1',
+      'scope3_cat2_capital_goods': 'scope3Cat2',
+      'scope3_cat3_fuel_energy_activities': 'scope3Cat3',
+      'scope3_cat4_upstream_transportation': 'scope3Cat4',
+      'scope3_cat5_waste_generated': 'scope3Cat5',
+      'scope3_cat6_business_travel': 'scope3Cat6',
+      'scope3_cat7_employee_commuting': 'scope3Cat7',
+      'scope3_cat8_upstream_leased_assets': 'scope3Cat8',
+      'scope3_cat9_downstream_transportation': 'scope3Cat9',
+      'scope3_cat10_processing_sold_products': 'scope3Cat10',
+      'scope3_cat11_use_sold_products': 'scope3Cat11',
+      'scope3_cat12_end_of_life_treatment': 'scope3Cat12',
+      'scope3_cat13_downstream_leased_assets': 'scope3Cat13',
+      'scope3_cat14_franchises': 'scope3Cat14',
+      'scope3_cat15_investments': 'scope3Cat15'
+    };
+  }
+
+  /**
+   * Get GHG category definitions for documentation
+   */
+  private getGhgCategoryDefinitions(): Record<string, string> {
+    return {
+      'scope1': 'Direct GHG emissions from owned or controlled sources',
+      'scope2_location': 'Indirect GHG emissions from purchased electricity (location-based)',
+      'scope2_market': 'Indirect GHG emissions from purchased electricity (market-based)',
+      'scope3_total': 'All other indirect GHG emissions in value chain',
+      'scope3_cat1_purchased_goods_services': 'Purchased goods and services',
+      'scope3_cat2_capital_goods': 'Capital goods',
+      'scope3_cat3_fuel_energy_activities': 'Fuel and energy related activities',
+      'scope3_cat4_upstream_transportation': 'Upstream transportation and distribution',
+      'scope3_cat5_waste_generated': 'Waste generated in operations',
+      'scope3_cat6_business_travel': 'Business travel',
+      'scope3_cat7_employee_commuting': 'Employee commuting',
+      'scope3_cat8_upstream_leased_assets': 'Upstream leased assets',
+      'scope3_cat9_downstream_transportation': 'Downstream transportation and distribution',
+      'scope3_cat10_processing_sold_products': 'Processing of sold products',
+      'scope3_cat11_use_sold_products': 'Use of sold products',
+      'scope3_cat12_end_of_life_treatment': 'End-of-life treatment of sold products',
+      'scope3_cat13_downstream_leased_assets': 'Downstream leased assets',
+      'scope3_cat14_franchises': 'Franchises',
+      'scope3_cat15_investments': 'Investments'
+    };
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DynamicRetrievalConfigMode, GoogleGenAI, Type } from '@google/genai';
+import { CATEGORY_SCHEMA } from 'src/constants';
 
 @Injectable()
 export class GeminiModelService {
@@ -14,7 +15,7 @@ export class GeminiModelService {
   private initializeModelConfigs(): void {
     // Generic model
     this.modelConfigs.generic = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
     };
 
     this.modelConfigs.validateCompany = {
@@ -26,7 +27,7 @@ export class GeminiModelService {
     }
 
     this.modelConfigs.companyNameChecker = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -37,12 +38,17 @@ export class GeminiModelService {
     };
 
     this.modelConfigs.companyCategory = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         temperature: 0.0,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            companyCategory: { type: Type.STRING, enum: CATEGORY_SCHEMA }
+          }
+        }
       },
       systemInstruction: `You will return responses in this JSON format only :
-      If the comony is Other business services, return Other business services - {The type of service provided by the company}
         {
           "companyCategory": "The category of the given company, is the most appropriate category possible from the following list:
             Paddy rice
@@ -218,7 +224,6 @@ Real estate services
 Renting services of machinery and equipment without operator and of personal and household goods
 Computer and related services
 Research and development services
-Other business services
 Public administration and defence services; compulsory social security services 
 Education services
 Health and social work services
@@ -244,7 +249,6 @@ Textiles waste for treatment: landfill
 Wood waste for treatment: landfill
 Membership organisation services n.e.c.
 Recreational, cultural and sporting services
-Other services
 Private households with employed persons
 Extra-territorial organizations and bodies
           "
@@ -253,7 +257,7 @@ Extra-territorial organizations and bodies
 
     // Related companies model
     this.modelConfigs.relatedCompanies = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -264,7 +268,7 @@ Extra-territorial organizations and bodies
     };
 
     this.modelConfigs.countryFinder = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -278,7 +282,7 @@ Extra-territorial organizations and bodies
 
     // Parent company finder model
     this.modelConfigs.parentCompanyFinder = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -290,7 +294,7 @@ Extra-territorial organizations and bodies
 
     // Report finder model
     this.modelConfigs.reportFinder = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         temperature: 0.0,
       },
@@ -305,7 +309,7 @@ Extra-territorial organizations and bodies
 
     // Annual report finder model
     this.modelConfigs.annualReportFinder = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -317,7 +321,7 @@ Extra-territorial organizations and bodies
     }
 
     this.modelConfigs.googleESGReportFinder = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         temperature: 0.0,
         tools: [{googleSearch: {}}],
@@ -332,7 +336,7 @@ Extra-territorial organizations and bodies
 
     // Direct report finder model
     this.modelConfigs.directReportFinder = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.0,
@@ -346,7 +350,7 @@ Extra-territorial organizations and bodies
     };
 
     this.modelConfigs.auditedCompanies = {
-      model: 'gemini-2.5-flash-lite-preview-06-17',
+      model: 'gemini-2.5-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.0,

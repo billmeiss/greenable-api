@@ -5,7 +5,8 @@ import { GeminiModelService } from './services/gemini-model.service';
 import { GeminiApiService } from './services/gemini-api.service';
 import { EmissionsReportService } from './services/emissions-report.service';
 import { ReportFinderService } from './services/report-finder.service';
-import axios from 'axios';
+import { CATEGORY_SCHEMA } from './constants';
+
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
@@ -113,17 +114,77 @@ export class AppService {
   }
 
   async updateCategories(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 4641 });
-    for (const company of companies) {
-      const { name, category: existingCategory } = company;
-      const category = await this.companyService.getCompanyCategory(name);
-      try {
-        await this.companyService.updateCompanyCategory(name, category);
-      } catch (error) {
-        console.log(`[ERROR] Failed to update category for ${name}: ${error.message}`);
-        continue;
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10710 });
+    
+    if (companies.length === 0) {
+      this.logger.log('No companies found for category update');
+      return {
+        success: true,
+        message: 'No companies found for category update',
+        totalCompanies: 0,
+        successfulUpdates: 0,
+        failedUpdates: 0
+      };
+    }
+    
+    this.logger.log(`Found ${companies.length} companies to update categories`);
+    
+    let successfulUpdates = 0;
+    let failedUpdates = 0;
+    
+    // Process companies in batches to avoid overwhelming the system
+    const batchSize = 10;
+    for (let i = 0; i < companies.length; i += batchSize) {
+      const batch = companies.slice(i, i + batchSize);
+      
+      this.logger.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(companies.length / batchSize)} (${batch.length} companies)`);
+      
+      const batchPromises = batch.map(async (company) => {
+        try {
+          const { name, country, reportUrl } = company;
+          const category = await this.companyService.getCompanyCategory(name, country, reportUrl);
+          
+          if (category) {
+            await this.companyService.updateCompanyCategory(name, category);
+            this.logger.log(`[SUCCESS] Updated category for ${name}: ${category}`);
+            return { success: true, company: name };
+          } else {
+            this.logger.warn(`[WARNING] No category found for ${name}`);
+            return { success: false, company: name, error: 'No category found' };
+          }
+        } catch (error) {
+          this.logger.error(`[ERROR] Failed to update category for ${company.name}: ${error.message}`);
+          return { success: false, company: company.name, error: error.message };
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Count results for this batch
+      batchResults.forEach(result => {
+        if (result.success) {
+          successfulUpdates++;
+        } else {
+          failedUpdates++;
+        }
+      });
+      
+      // Add a small delay between batches to avoid rate limiting
+      if (i + batchSize < companies.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
+    
+    const result = {
+      success: true,
+      message: `Category update completed. ${successfulUpdates} successful, ${failedUpdates} failed`,
+      totalCompanies: companies.length,
+      successfulUpdates,
+      failedUpdates
+    };
+    
+    this.logger.log(`Category update completed: ${JSON.stringify(result)}`);
+    return result;
   }
 
   async updateAuditedCompanies(): Promise<any> {
@@ -181,7 +242,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 2042, toRow: 5500 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 2236, toRow: 5500 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
@@ -658,6 +719,26 @@ export class AppService {
         error: error.message,
         totalRowsProcessed: 0,
         totalCellsCleaned: 0
+      };
+    }
+  }
+
+  /**
+   * Calculate average emissions per dollar for every GHG emission category by industry
+   */
+  async calculateAverageEmissionsByIndustry(): Promise<any> {
+    try {
+      this.logger.log('Starting calculation of average emissions per dollar by industry');
+      const result = await this.companyService.calculateAverageEmissionsByIndustry();
+      
+      this.logger.log(`Average emissions calculation completed for ${Object.keys(result.industries || {}).length} industries`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error calculating average emissions by industry: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        industries: {}
       };
     }
   }
