@@ -634,14 +634,7 @@ export class CompanyService {
       };
     }
     
-    return {
-      revenue: null,
-      year: targetYear,
-      source: 'Error occurred during retrieval',
-      confidence: 0,
-      currency: 'USD',
-      employeeCount: null
-    };
+    return null;
   }
 
   /**
@@ -870,9 +863,10 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       console.log(`[STEP] Fetching data from 'Analysed Data' sheet`);
       
       // Use the SheetsApiService with built-in exponential backoff
+      // Extended range to include third party assurance data (columns AF and AG)
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow || 2}:AR${toRow || 5500}`
+        `'Analysed Data'!A${fromRow || 2}:AN${toRow || 5500}`
       );
       
       const rows = data.values || [];
@@ -909,8 +903,9 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         newRevenueUrl: row[38],
         newRevenueAmount: row[39],
         newRevenueCurrency: row[40],
-        notes: row[32],
-        scope3Mismatch: row[43]
+        notes: row[32], // Column AG - general emissions notes
+        scope3Mismatch: row[43],
+        thirdPartyAssuranceCompany: row[31] // Column AF (0-indexed as 31)
       })).filter(Boolean);
 
       console.log(companies.length);
@@ -1525,6 +1520,18 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         if (exchangeRate) {
           revenue = revenue / exchangeRate;
           revenueCurrency = 'USD';
+        } else {
+          const revenueData = await this.convertCurrencyUsingGemini({
+            revenue: revenue,
+            currency: revenueCurrency,
+            year: revenueYear,
+            source: 'Gemini',
+            confidence: 1
+          }, {
+            year: revenueYear,
+            source: 'Gemini',
+            confidence: 1
+          });
         }
       }
 
@@ -1866,7 +1873,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Update the cell with the new revenue data
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AN${companyIndex + 2}`,
+        `Analysed Data!F${companyIndex + 2}`,
         [[revenueData.revenue, revenueData.currency]]
       );
 
@@ -2424,14 +2431,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const companiesWithBasicData = this.filterCompaniesWithBasicData(allCompanies);
       this.logger.log(`Found ${companiesWithBasicData.length} companies with basic data`);
       
-      // Group companies by industry category using CATEGORY_SCHEMA
-      const companiesByIndustry = this.groupCompaniesByIndustryFromSchema(companiesWithBasicData);
+      // Group companies by industry category and revenue range using CATEGORY_SCHEMA
+      const companiesByIndustryAndRevenue = this.groupCompaniesByIndustryFromSchema(companiesWithBasicData);
       
-      // Calculate averages for each industry and category individually with outlier removal
-      const industryAverages = this.calculateIndustryAveragesByCategory(companiesByIndustry);
+      // Calculate averages for each industry, revenue range, and category individually with outlier removal
+      const industryAverages = this.calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue);
       
       // Get summary of companies used in calculations for each category
-      const companiesUsedSummary = this.getCompaniesUsedSummaryByCategory(companiesByIndustry);
+      const companiesUsedSummary = this.getCompaniesUsedSummaryByCategory(companiesByIndustryAndRevenue);
       
       return {
         success: true,
@@ -2443,18 +2450,21 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         metadata: {
           ghgCategories: this.getGhgCategoryDefinitions(),
           industryCategories: this.getValidIndustryCategories(),
-          calculationMethod: 'Average emissions per dollar (kg CO2e/USD) with category-specific outlier removal',
-          dataCompleteness: 'Companies included per category based on data availability for that specific category',
-          outlierRemovalMethod: 'Interquartile Range (IQR) with 1.5x multiplier applied individually to each category',
+          revenueRanges: this.getRevenueRanges(),
+          calculationMethod: 'Average emissions per dollar (kg CO2e/USD) with category-specific outlier removal, segmented by revenue ranges, using only audited companies',
+          dataCompleteness: 'Only audited companies (with third party assurance) included per category based on data availability for that specific category, segmented by revenue to avoid skewing',
+          outlierRemovalMethod: 'Interquartile Range (IQR) with 1.0x multiplier (stricter bounds) applied individually to each category within each revenue segment',
           emissionsUnit: 'kg CO2e per USD (converted from tons CO2e to kg CO2e)',
           calculationFlow: [
-            '1. Filter companies with basic data (name, industry category from CATEGORY_SCHEMA, revenue)',
-            '2. Group companies by industry category',
-            '3. For each industry and each GHG category:',
+            '1. Filter companies with basic data (name, industry category from CATEGORY_SCHEMA, revenue) AND third party assurance (audited companies only)',
+            '2. Group companies by industry category AND revenue range (0-50M, 50M-250M, 250M-1B, 1B+)',
+            '3. For each industry, revenue range, and each GHG category:',
             '   a. Calculate emissions per dollar for companies with valid data for that category',
-            '   b. Remove outliers specific to that category using IQR method',
-            '   c. Calculate averages using non-outlier companies for that category',
-            '4. Companies can be included in some categories but excluded from others based on outlier status'
+            '   b. Remove outliers specific to that category using stricter IQR method (1.0x instead of 1.5x)',
+            '   c. Calculate averages using non-outlier companies for that category within the revenue segment',
+            '4. Companies can be included in some categories but excluded from others based on outlier status',
+            '5. Revenue segmentation prevents large companies from skewing averages for smaller companies',
+            '6. Only audited companies (with third party assurance) are included for data quality assurance'
           ]
         }
       };
@@ -2466,7 +2476,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   /**
    * Filter companies that have basic required data (name, industry category, revenue)
-   * and valid data for scope 3 categories 1-8
+   * and have been audited (third party assurance)
    */
   private filterCompaniesWithBasicData(companies: any[]): any[] {
     return companies.filter(company => {
@@ -2482,18 +2492,23 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const hasValidIndustryCategory = this.isValidIndustryCategory(company.category);
       if (!hasValidIndustryCategory) return false;
       
-      // Must have valid data for scope 3 categories 1-8
-      const scope3RequiredCategories = [
-        'scope3Cat1', 'scope3Cat2', 'scope3Cat3', 'scope3Cat4',
-        'scope3Cat5', 'scope3Cat6', 'scope3Cat7', 'scope3Cat8'
-      ];
+      // Must have been audited (third party assurance)
+      const hasThirdPartyAssurance = this.hasValidThirdPartyAssurance(company.thirdPartyAssuranceCompany);
+      if (!hasThirdPartyAssurance) return false;
       
-      const hasValidScope3Data = scope3RequiredCategories.every(category => 
-        this.isValidValue(company[category])
-      );
-      
-      return hasValidScope3Data;
+      return true;
     });
+  }
+
+  /**
+   * Check if a company has valid third party assurance (has been audited)
+   */
+  private hasValidThirdPartyAssurance(thirdPartyAssuranceCompany: any): boolean {
+    return thirdPartyAssuranceCompany && 
+           typeof thirdPartyAssuranceCompany === 'string' && 
+           thirdPartyAssuranceCompany.trim() !== '' &&
+           thirdPartyAssuranceCompany.toLowerCase() !== 'null' &&
+           thirdPartyAssuranceCompany.toLowerCase() !== 'undefined';
   }
 
   /**
@@ -2504,20 +2519,46 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   /**
-   * Group companies by their industry category using only valid CATEGORY_SCHEMA categories
+   * Define revenue ranges for segmentation to avoid skewing
    */
-  private groupCompaniesByIndustryFromSchema(companies: any[]): Record<string, any[]> {
-    const grouped: Record<string, any[]> = {};
+  private getRevenueRanges(): Array<{name: string, min: number, max: number}> {
+    return [
+      { name: '0-50M', min: 0, max: 50000000 },
+      { name: '50M-250M', min: 50000000, max: 250000000 },
+      { name: '250M-1B', min: 250000000, max: 1000000000 },
+      { name: '1B+', min: 1000000000, max: 10000000000 }
+    ];
+  }
+
+  /**
+   * Determine which revenue range a company belongs to
+   */
+  private getRevenueRangeForCompany(revenue: number): string {
+    const ranges = this.getRevenueRanges();
+    const range = ranges.find(r => revenue >= r.min && revenue < r.max);
+    return range ? range.name : 'Unknown';
+  }
+
+  /**
+   * Group companies by their industry category and revenue range using only valid CATEGORY_SCHEMA categories
+   */
+  private groupCompaniesByIndustryFromSchema(companies: any[]): Record<string, Record<string, any[]>> {
+    const grouped: Record<string, Record<string, any[]>> = {};
     
     companies.forEach(company => {
       const industry = company.category;
+      const revenue = this.parseNumericValue(company.revenue);
+      const revenueRange = this.getRevenueRangeForCompany(revenue);
       
-      // Only group if the industry is in CATEGORY_SCHEMA
-      if (this.isValidIndustryCategory(industry)) {
+      // Only group if the industry is in CATEGORY_SCHEMA and has valid revenue
+      if (this.isValidIndustryCategory(industry) && revenue > 0) {
         if (!grouped[industry]) {
-          grouped[industry] = [];
+          grouped[industry] = {};
         }
-        grouped[industry].push(company);
+        if (!grouped[industry][revenueRange]) {
+          grouped[industry][revenueRange] = [];
+        }
+        grouped[industry][revenueRange].push(company);
       }
     });
     
@@ -2587,18 +2628,28 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   /**
    * Calculate industry averages for each category individually with category-specific outlier removal
+   * Now segments by revenue ranges to avoid skewing
    */
-  private calculateIndustryAveragesByCategory(companiesByIndustry: Record<string, any[]>): Record<string, any> {
+  private calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue: Record<string, Record<string, any[]>>): Record<string, any> {
     const results: Record<string, any> = {};
     
-    Object.entries(companiesByIndustry).forEach(([industry, companies]) => {
-      if (companies.length < 3) {
-        // Skip industries with less than 3 companies
-        this.logger.warn(`Skipping industry '${industry}' - insufficient data (${companies.length} companies)`);
-        return;
-      }
+    Object.entries(companiesByIndustryAndRevenue).forEach(([industry, revenueRanges]) => {
+      results[industry] = {};
       
-      results[industry] = this.calculateIndustryAveragesWithCategorySpecificOutliers(companies);
+      Object.entries(revenueRanges).forEach(([revenueRange, companies]) => {
+        if (companies.length < 3) {
+          // Skip revenue ranges with less than 3 companies
+          this.logger.warn(`Skipping industry '${industry}' revenue range '${revenueRange}' - insufficient data (${companies.length} companies)`);
+          return;
+        }
+        
+        results[industry][revenueRange] = this.calculateIndustryAveragesWithCategorySpecificOutliers(companies);
+      });
+      
+      // Remove empty industry entries
+      if (Object.keys(results[industry]).length === 0) {
+        delete results[industry];
+      }
     });
     
     return results;
@@ -2653,26 +2704,30 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   /**
-   * Get summary of companies used in calculations for each category
+   * Get summary of companies used in calculations for each category, segmented by revenue range
    */
-  private getCompaniesUsedSummaryByCategory(companiesByIndustry: Record<string, any[]>): Record<string, any> {
+  private getCompaniesUsedSummaryByCategory(companiesByIndustryAndRevenue: Record<string, Record<string, any[]>>): Record<string, any> {
     const summary: Record<string, any> = {};
     const ghgCategories = this.getGhgCategoryMappings();
     
-    Object.entries(companiesByIndustry).forEach(([industry, companies]) => {
+    Object.entries(companiesByIndustryAndRevenue).forEach(([industry, revenueRanges]) => {
       summary[industry] = {};
       
-      Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
-        // Calculate how many companies have valid data for this category
-        const emissionsPerDollar = this.calculateEmissionsPerDollarForCategory(companies, fieldName);
-        const cleanedData = this.removeOutliers(emissionsPerDollar);
+      Object.entries(revenueRanges).forEach(([revenueRange, companies]) => {
+        summary[industry][revenueRange] = {};
         
-        summary[industry][categoryName] = {
-          totalCompaniesInIndustry: companies.length,
-          companiesWithValidData: emissionsPerDollar.length,
-          companiesAfterOutlierRemoval: cleanedData.length,
-          outliersRemoved: emissionsPerDollar.length - cleanedData.length
-        };
+        Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
+          // Calculate how many companies have valid data for this category
+          const emissionsPerDollar = this.calculateEmissionsPerDollarForCategory(companies, fieldName);
+          const cleanedData = this.removeOutliers(emissionsPerDollar);
+          
+          summary[industry][revenueRange][categoryName] = {
+            totalCompaniesInSegment: companies.length,
+            companiesWithValidData: emissionsPerDollar.length,
+            companiesAfterOutlierRemoval: cleanedData.length,
+            outliersRemoved: emissionsPerDollar.length - cleanedData.length
+          };
+        });
       });
     });
     
@@ -2722,7 +2777,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   /**
-   * Remove outliers using the Interquartile Range (IQR) method
+   * Remove outliers using the Interquartile Range (IQR) method with stricter bounds
    * This operates on emissions per dollar ratios, NOT raw emissions data
    */
   private removeOutliers(data: number[]): number[] {
@@ -2738,8 +2793,9 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const q3 = sorted[q3Index];
     const iqr = q3 - q1;
     
-    const lowerBound = q1 - (1.5 * iqr);
-    const upperBound = q3 + (1.5 * iqr);
+    // Stricter outlier bounds: reduced from 1.5 to 1.0 for more aggressive outlier removal
+    const lowerBound = q1 - (1.0 * iqr);
+    const upperBound = q3 + (1.0 * iqr);
     
     return data.filter(value => value >= lowerBound && value <= upperBound);
   }
@@ -2832,5 +2888,372 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       'scope3_cat14_franchises': 'Franchises',
       'scope3_cat15_investments': 'Investments'
     };
+  }
+
+  /**
+   * Check and fix companies with revenue source errors
+   * Re-extracts revenue data from reports and converts currencies to USD
+   */
+  async fixCompaniesWithRevenueSourceErrors(): Promise<{
+    success: boolean,
+    totalCompaniesProcessed: number,
+    successfulUpdates: number,
+    errors: string[]
+  }> {
+    try {
+      this.logger.log('Starting revenue source error fix process');
+      
+      const companiesWithErrors = await this.getCompaniesWithRevenueSourceErrors();
+      this.logger.log(`Found ${companiesWithErrors.length} companies with revenue source errors`);
+      
+      if (companiesWithErrors.length === 0) {
+        return {
+          success: true,
+          totalCompaniesProcessed: 0,
+          successfulUpdates: 0,
+          errors: []
+        };
+      }
+      
+      const results = await this.processCompaniesWithRevenueErrors(companiesWithErrors);
+      
+      this.logger.log(`Revenue error fix completed. Processed: ${results.totalCompaniesProcessed}, Updated: ${results.successfulUpdates}`);
+      
+      return results;
+    } catch (error) {
+      this.logger.error(`Error in fixCompaniesWithRevenueSourceErrors: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get companies that have revenue source errors
+   */
+  private async getCompaniesWithRevenueSourceErrors(): Promise<any[]> {
+    try {
+      const allCompanies = await this.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10710 });
+      
+      return allCompanies.filter(company => {
+        console.log(company);
+        const hasRevenueSourceError = company.revenueUrl && 
+          company.revenueUrl === 'Error occurred during retrieval';
+        
+        
+        return hasRevenueSourceError;
+      });
+    } catch (error) {
+      this.logger.error(`Error getting companies with revenue source errors: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Process companies with revenue errors and update their data in batches of 5
+   */
+  private async processCompaniesWithRevenueErrors(companies: any[]): Promise<{
+    success: boolean,
+    totalCompaniesProcessed: number,
+    successfulUpdates: number,
+    errors: string[]
+  }> {
+    const errors: string[] = [];
+    let successfulUpdates = 0;
+    const BATCH_SIZE = 5;
+    
+    // Split companies into batches
+    const batches = this.createBatches(companies, BATCH_SIZE);
+    this.logger.log(`Processing ${companies.length} companies in ${batches.length} batches of ${BATCH_SIZE}`);
+    
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      this.logger.log(`Processing batch ${batchIndex + 1}/${batches.length} with ${batch.length} companies`);
+      
+      // Process all companies in the current batch in parallel
+      const batchPromises = batch.map(async (company) => {
+        try {
+          this.logger.log(`Processing revenue error fix for ${company.name}`);
+          
+          const revenueData = await this.reExtractRevenueFromReport(company);
+          
+          if (revenueData && revenueData.revenue) {
+            const convertedRevenueData = await this.convertRevenueToUSD(revenueData, company);
+            const updateSuccess = await this.updateCompanyRevenueData(company.name, convertedRevenueData);
+            
+            if (updateSuccess) {
+              this.logger.log(`Successfully updated revenue for ${company.name}`);
+              return { success: true, company: company.name };
+            } else {
+              const error = `Failed to update spreadsheet for ${company.name}`;
+              this.logger.error(error);
+              return { success: false, company: company.name, error };
+            }
+          } else {
+            const error = `Failed to extract revenue data for ${company.name}`;
+            this.logger.error(error);
+            return { success: false, company: company.name, error };
+          }
+        } catch (error) {
+          const errorMsg = `Error processing ${company.name}: ${error.message}`;
+          this.logger.error(errorMsg);
+          return { success: false, company: company.name, error: errorMsg };
+        }
+      });
+      
+      // Wait for all companies in the current batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Process batch results
+      for (const result of batchResults) {
+        if (result.success) {
+          successfulUpdates++;
+        } else {
+          errors.push(result.error);
+        }
+      }
+      
+      this.logger.log(`Batch ${batchIndex + 1}/${batches.length} completed. Successful: ${batchResults.filter(r => r.success).length}, Errors: ${batchResults.filter(r => !r.success).length}`);
+      
+      // Add a small delay between batches to prevent overwhelming the API
+      if (batchIndex < batches.length - 1) {
+        this.logger.log(`Waiting 2 seconds before processing next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    return {
+      success: errors.length === 0,
+      totalCompaniesProcessed: companies.length,
+      successfulUpdates,
+      errors
+    };
+  }
+
+  /**
+   * Helper method to split an array into batches of specified size
+   */
+  private createBatches<T>(array: T[], batchSize: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < array.length; i += batchSize) {
+      batches.push(array.slice(i, i + batchSize));
+    }
+    return batches;
+  }
+
+  /**
+   * Re-extract revenue data from company report using Gemini
+   */
+  private async reExtractRevenueFromReport(company: any): Promise<RevenueData | null> {
+    try {
+      const targetYear = this.extractTargetYear(company.reportingPeriod);
+      
+      this.logger.log(`Re-extracting revenue data for ${company.name} from report: ${company.reportUrl}`);
+      
+      const prompt = this.buildRevenueAndCurrencyExtractionPrompt(company.name, targetYear);
+      
+      const response = await this.geminiAiService.processUrl(
+        company.reportUrl,
+        prompt,
+        'revenueAndCurrencyExtraction'
+      );
+      
+      const parsedResponse = this.geminiApiService.safelyParseJson(response);
+      
+      if (!parsedResponse?.revenue) {
+        this.logger.warn(`No revenue found in re-extraction for ${company.name}`);
+        return null;
+      }
+      
+      return {
+        revenue: parsedResponse.revenue,
+        year: parsedResponse.year || targetYear,
+        source: `Re-extracted from ${this.determineReportSource(company.reportUrl)}`,
+        confidence: parsedResponse.confidence || 8,
+        sourceUrl: company.reportUrl,
+        currency: parsedResponse.currency || 'USD',
+        employeeCount: parsedResponse.employeeCount || null
+      };
+    } catch (error) {
+      this.logger.error(`Error re-extracting revenue for ${company.name}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Build enhanced prompt for revenue and currency extraction with currency validation
+   */
+  private buildRevenueAndCurrencyExtractionPrompt(companyName: string, targetYear: string): string {
+    return `
+      Extract accurate financial information for ${companyName} from this document.
+      ${targetYear !== 'recent' ? `Focus on data for the year ${targetYear}.` : 'Use the most recent data available.'}
+      
+      CRITICAL INSTRUCTIONS FOR CURRENCY DETECTION:
+      1. Find the total revenue/turnover for the company
+      2. CAREFULLY identify the currency used for revenue reporting
+      3. Look for currency symbols (£, €, ¥, $, etc.) or currency codes (USD, EUR, GBP, JPY, etc.)
+      4. Check if revenue is reported in local currency or converted to USD
+      5. Ensure revenue value matches the identified currency
+      6. Convert revenue to a single numeric value (not thousands or millions notation)
+      7. Find employee count if available
+      
+      CURRENCY VALIDATION REQUIREMENTS:
+      - If you see "$" without country specification, determine if it's USD, CAD, AUD, etc. based on company location
+      - If you see "million" or "thousand", convert to full numeric value
+      - Be explicit about currency - don't assume USD unless clearly stated
+      - Look for phrases like "in millions of USD" or "£ thousands"
+      
+      Return ONLY a JSON object in this exact format:
+      {
+        "revenue": 1234567890,
+        "currency": "USD",
+        "year": "2023",
+        "employeeCount": 50000,
+        "confidence": 9,
+        "currencyConfidence": 9,
+        "currencySource": "Clearly stated in financial statements as USD millions"
+      }
+      
+      IMPORTANT: Set currencyConfidence (1-10) based on how certain you are about the currency identification.
+      If currency is ambiguous, set currencyConfidence to 5 or lower and explain in currencySource.
+    `;
+  }
+
+  /**
+   * Convert revenue to USD if needed using exchange rates or Gemini for currency conversion
+   */
+   async convertRevenueToUSD(revenueData: RevenueData, company: any): Promise<RevenueData> {
+    if (revenueData.currency === 'USD') {
+      this.logger.log(`Revenue for ${company.name} already in USD`);
+      return revenueData;
+    }
+    
+    try {
+      // First try using existing exchange rate data
+      const exchangeRate = await this.getExchangeRate(company.reportingPeriod, revenueData.currency);
+      
+      if (exchangeRate && exchangeRate > 0) {
+        const convertedRevenue = revenueData.revenue / exchangeRate;
+        this.logger.log(`Converted ${company.name} revenue from ${revenueData.currency} to USD using stored rate: ${exchangeRate}`);
+        
+        return {
+          ...revenueData,
+          revenue: convertedRevenue,
+          currency: 'USD',
+          source: `${revenueData.source} (converted from ${revenueData.currency} using stored exchange rate)`
+        };
+      }
+      
+      // Fallback to Gemini for currency conversion
+      return await this.convertCurrencyUsingGemini(revenueData, company);
+    } catch (error) {
+      this.logger.error(`Error converting currency for ${company.name}: ${error.message}`);
+      return revenueData; // Return original data if conversion fails
+    }
+  }
+
+  /**
+   * Use Gemini to convert currency when exchange rate data is not available
+   */
+   async convertCurrencyUsingGemini(revenueData: RevenueData, company: any): Promise<RevenueData> {
+    try {
+      const year = this.extractYearFromPeriod(company.reportingPeriod);
+      
+      const prompt = `
+        Convert the following revenue amount to USD:
+        - Amount: ${revenueData.revenue}
+        - Currency: ${revenueData.currency}
+        - Year: ${year}
+        
+        Please find the accurate exchange rate for ${revenueData.currency} to USD for the year ${year}.
+        Use reliable financial data sources for the exchange rate. If the year is in the future then just return the latest exchange rate.
+        
+        Return ONLY a JSON object:
+        {
+          "convertedAmount": 1234567890,
+          "currency": "USD"
+        }
+      `;
+      
+      const conversionModel = this.geminiModelService.getModel('revenueConversion');
+      const response = await this.geminiApiService.handleGeminiCall(
+        () => conversionModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        })
+      );
+
+      console.log(response.text);
+      
+      const parsedResponse = this.geminiApiService.safelyParseJson(response.text);
+      
+      if (parsedResponse?.convertedAmount) {
+        this.logger.log(`Converted ${company.name} revenue from ${revenueData.currency} to USD using Gemini conversion`);
+        
+        return {
+          ...revenueData,
+          revenue: parsedResponse.convertedAmount,
+          currency: 'USD',
+          source: `${revenueData.source} (converted from ${revenueData.currency} using Gemini with rate ${parsedResponse.exchangeRate})`
+        };
+      }
+      
+      this.logger.warn(`Failed to convert currency using Gemini for ${company.name}`);
+      return revenueData;
+    } catch (error) {
+      this.logger.error(`Error in Gemini currency conversion for ${company.name}: ${error.message}`);
+      return revenueData;
+    }
+  }
+
+  /**
+   * Update company revenue data in the spreadsheet with improved error handling
+   */
+  private async updateCompanyRevenueData(companyName: string, revenueData: RevenueData): Promise<boolean> {
+    try {
+      this.logger.log(`Updating revenue data for ${companyName} in spreadsheet`);
+      
+      // Find the company row
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!A2:AH`
+      );
+
+      const rows = data.values || [];
+      const companyIndex = rows.findIndex(row => row[0] === companyName);
+
+      if (companyIndex === -1) {
+        this.logger.error(`Company ${companyName} not found in 'Analysed Data' sheet`);
+        return false;
+      }
+
+      const actualRowNumber = companyIndex + 2;
+
+      // Update revenue (column F), currency (column G), and source (column AH)
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!F${actualRowNumber}:G${actualRowNumber}`,
+        [[revenueData.revenue, revenueData.currency]]
+      );
+
+      // Update revenue source (column AH)
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        `Analysed Data!AH${actualRowNumber}`,
+        [[revenueData.source]]
+      );
+
+      // Update source URL if available (column AI)
+      if (revenueData.sourceUrl) {
+        await this.sheetsApiService.updateValues(
+          this.SPREADSHEET_ID,
+          `Analysed Data!AI${actualRowNumber}`,
+          [[revenueData.sourceUrl]]
+        );
+      }
+
+      this.logger.log(`Successfully updated revenue data for ${companyName}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error updating revenue data for ${companyName}: ${error.message}`);
+      return false;
+    }
   }
 }

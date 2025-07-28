@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DynamicRetrievalConfigMode, GoogleGenAI, Type } from '@google/genai';
 import { CATEGORY_SCHEMA } from 'src/constants';
+import { response } from 'express';
 
 @Injectable()
 export class GeminiModelService {
@@ -306,6 +307,19 @@ Extra-territorial organizations and bodies
             
             The reportUrl field is required and must be a string.`
     };
+
+    this.modelConfigs.revenueAndCurrencyExtraction = {
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+      },
+      systemInstruction: `You will return responses in this JSON format:
+            {
+              "revenue": "The revenue of the company",
+              "currency": "The currency of the revenue"
+            }`
+    }
 
     // Annual report finder model
     this.modelConfigs.annualReportFinder = {
@@ -636,6 +650,21 @@ Extra-territorial organizations and bodies
             {
               "employees": 0,
             }`
+    }
+
+    this.modelConfigs.revenueConversion = {
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        temperature: 0.0,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            convertedAmount: { type: Type.NUMBER },
+            currency: { type: Type.STRING },
+          }
+        }
+      },
     }
 
     // Revenue model
