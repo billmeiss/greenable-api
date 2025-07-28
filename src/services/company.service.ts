@@ -2410,43 +2410,52 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   /**
    * Calculate average emissions per dollar for every GHG emission category by industry
-   * Only uses companies with complete quantitative data and removes outliers
+   * Processes each category individually and removes outliers specific to each category
    * Results are in kg CO2e per USD (emissions converted from tons to kg)
    */
   async calculateAverageEmissionsByIndustry(): Promise<any> {
     try {
       this.logger.log('Fetching all companies from spreadsheet');
-      const allCompanies = await this.getExistingCompaniesFromSheet();
+      const allCompanies = await this.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10710 });
       
       this.logger.log(`Processing ${allCompanies.length} total companies`);
       
-      // Filter companies with complete quantitative data across ALL categories
-      const companiesWithCompleteData = this.filterCompaniesWithCompleteDataAllCategories(allCompanies);
-      this.logger.log(`Found ${companiesWithCompleteData.length} companies with complete data across all categories`);
+      // Filter companies with basic required data (name, category, revenue)
+      const companiesWithBasicData = this.filterCompaniesWithBasicData(allCompanies);
+      this.logger.log(`Found ${companiesWithBasicData.length} companies with basic data`);
       
       // Group companies by industry category using CATEGORY_SCHEMA
-      const companiesByIndustry = this.groupCompaniesByIndustryFromSchema(companiesWithCompleteData);
+      const companiesByIndustry = this.groupCompaniesByIndustryFromSchema(companiesWithBasicData);
       
-      // Calculate averages for each industry with outlier removal
-      const industryAverages = this.calculateIndustryAveragesWithOutlierRemoval(companiesByIndustry);
+      // Calculate averages for each industry and category individually with outlier removal
+      const industryAverages = this.calculateIndustryAveragesByCategory(companiesByIndustry);
       
-      // Get list of all companies used in calculations
-      const companiesUsedInCalculations = this.getCompaniesUsedInCalculations(companiesByIndustry);
+      // Get summary of companies used in calculations for each category
+      const companiesUsedSummary = this.getCompaniesUsedSummaryByCategory(companiesByIndustry);
       
       return {
         success: true,
         totalCompaniesProcessed: allCompanies.length,
-        companiesWithCompleteData: companiesWithCompleteData.length,
+        companiesWithBasicData: companiesWithBasicData.length,
         industriesAnalyzed: Object.keys(industryAverages).length,
-        companiesUsedInCalculations: companiesUsedInCalculations,
+        companiesUsedSummary: companiesUsedSummary,
         industries: industryAverages,
         metadata: {
           ghgCategories: this.getGhgCategoryDefinitions(),
           industryCategories: this.getValidIndustryCategories(),
-          calculationMethod: 'Average emissions per dollar (kg CO2e/USD) with outlier removal using IQR method',
-          dataCompleteness: 'Only companies with complete data across ALL GHG emission categories (Scope 1, 2, 3 total, and all 15 Scope 3 subcategories)',
-          outlierRemovalMethod: 'Interquartile Range (IQR) with 1.5x multiplier',
-          emissionsUnit: 'kg CO2e per USD (converted from tons CO2e to kg CO2e)'
+          calculationMethod: 'Average emissions per dollar (kg CO2e/USD) with category-specific outlier removal',
+          dataCompleteness: 'Companies included per category based on data availability for that specific category',
+          outlierRemovalMethod: 'Interquartile Range (IQR) with 1.5x multiplier applied individually to each category',
+          emissionsUnit: 'kg CO2e per USD (converted from tons CO2e to kg CO2e)',
+          calculationFlow: [
+            '1. Filter companies with basic data (name, industry category from CATEGORY_SCHEMA, revenue)',
+            '2. Group companies by industry category',
+            '3. For each industry and each GHG category:',
+            '   a. Calculate emissions per dollar for companies with valid data for that category',
+            '   b. Remove outliers specific to that category using IQR method',
+            '   c. Calculate averages using non-outlier companies for that category',
+            '4. Companies can be included in some categories but excluded from others based on outlier status'
+          ]
         }
       };
     } catch (error) {
@@ -2456,51 +2465,34 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   /**
-   * Filter companies that have complete quantitative data across ALL GHG emission categories
-   * A company must have valid data for every single category to be included
+   * Filter companies that have basic required data (name, industry category, revenue)
+   * and valid data for scope 3 categories 1-8
    */
-  private filterCompaniesWithCompleteDataAllCategories(companies: any[]): any[] {
+  private filterCompaniesWithBasicData(companies: any[]): any[] {
     return companies.filter(company => {
       // Must have basic required data
       const hasBasicData = company.name && company.category && company.revenue;
       if (!hasBasicData) return false;
       
-      // Must have valid revenue
-      const hasValidRevenue = this.isValidNumericValue(company.revenue);
+      // Must have valid revenue for calculations
+      const hasValidRevenue = this.isValidValue(company.revenue);
       if (!hasValidRevenue) return false;
-      
-      // Must have ALL scope emissions data
-      const requiredFields = [
-        'scope1',
-        'scope2Location',
-        'scope2Market', 
-        'scope3',
-        'scope3Cat1',
-        'scope3Cat2',
-        'scope3Cat3',
-        'scope3Cat4',
-        'scope3Cat5',
-        'scope3Cat6',
-        'scope3Cat7',
-        'scope3Cat8',
-        'scope3Cat9',
-        'scope3Cat10',
-        'scope3Cat11',
-        'scope3Cat12',
-        'scope3Cat13',
-        'scope3Cat14',
-        'scope3Cat15'
-      ];
-      
-      // Check if ALL required emission fields have valid data
-      const hasAllEmissionData = requiredFields.every(field => 
-        this.isValidNumericValue(company[field])
-      );
       
       // Must have a valid industry category from CATEGORY_SCHEMA
       const hasValidIndustryCategory = this.isValidIndustryCategory(company.category);
+      if (!hasValidIndustryCategory) return false;
       
-      return hasAllEmissionData && hasValidIndustryCategory;
+      // Must have valid data for scope 3 categories 1-8
+      const scope3RequiredCategories = [
+        'scope3Cat1', 'scope3Cat2', 'scope3Cat3', 'scope3Cat4',
+        'scope3Cat5', 'scope3Cat6', 'scope3Cat7', 'scope3Cat8'
+      ];
+      
+      const hasValidScope3Data = scope3RequiredCategories.every(category => 
+        this.isValidValue(company[category])
+      );
+      
+      return hasValidScope3Data;
     });
   }
 
@@ -2583,58 +2575,74 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   /**
    * Check if a value is a valid numeric value for calculations
    */
-  private isValidNumericValue(value: any): boolean {
+  private isValidValue(value: any): boolean {
     if (typeof value === 'number' && !isNaN(value) && value > 0) {
       return true;
     }
     if (typeof value === 'string') {
-      const numValue = parseFloat(value);
-      return !isNaN(numValue) && numValue > 0;
+      return value.trim() !== '';
     }
     return false;
   }
 
   /**
-   * Calculate industry averages with outlier removal for each GHG category
+   * Calculate industry averages for each category individually with category-specific outlier removal
    */
-  private calculateIndustryAveragesWithOutlierRemoval(companiesByIndustry: Record<string, any[]>): Record<string, any> {
+  private calculateIndustryAveragesByCategory(companiesByIndustry: Record<string, any[]>): Record<string, any> {
     const results: Record<string, any> = {};
     
     Object.entries(companiesByIndustry).forEach(([industry, companies]) => {
       if (companies.length < 3) {
-        // Skip industries with less than 3 companies (can't effectively remove outliers)
+        // Skip industries with less than 3 companies
         this.logger.warn(`Skipping industry '${industry}' - insufficient data (${companies.length} companies)`);
         return;
       }
       
-      results[industry] = this.calculateIndustryAverages(companies);
+      results[industry] = this.calculateIndustryAveragesWithCategorySpecificOutliers(companies);
     });
     
     return results;
   }
 
   /**
-   * Calculate averages for a single industry across all GHG categories
+   * Calculate averages for a single industry across all GHG categories with category-specific outlier removal
    */
-  private calculateIndustryAverages(companies: any[]): any {
+  private calculateIndustryAveragesWithCategorySpecificOutliers(companies: any[]): any {
     const ghgCategories = this.getGhgCategoryMappings();
     const averages: Record<string, any> = {};
     
     Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
+      // Calculate emissions per dollar ratios for companies with valid data for this category
       const emissionsPerDollar = this.calculateEmissionsPerDollarForCategory(companies, fieldName);
-      const cleanedData = this.removeOutliers(emissionsPerDollar);
       
-      if (cleanedData.length > 0) {
-        averages[categoryName] = {
-          averageEmissionsPerDollar: this.calculateMean(cleanedData),
-          unit: 'kg CO2e/USD',
-          companiesIncluded: cleanedData.length,
-          outlierCount: emissionsPerDollar.length - cleanedData.length,
-          standardDeviation: this.calculateStandardDeviation(cleanedData),
-          median: this.calculateMedian(cleanedData),
-          min: Math.min(...cleanedData),
-          max: Math.max(...cleanedData)
-        };
+      if (emissionsPerDollar.length > 0) {
+        // Remove outliers specific to this category
+        const cleanedData = this.removeOutliers(emissionsPerDollar);
+        const outliersRemoved = emissionsPerDollar.length - cleanedData.length;
+        
+        if (cleanedData.length > 0) {
+          // Log outlier removal for transparency
+          if (outliersRemoved > 0) {
+            this.logger.debug(`${categoryName}: Removed ${outliersRemoved} outliers from ${emissionsPerDollar.length} companies (${((outliersRemoved/emissionsPerDollar.length)*100).toFixed(1)}%)`);
+          }
+          
+          averages[categoryName] = {
+            averageEmissionsPerDollar: this.calculateMean(cleanedData),
+            unit: 'kg CO2e/USD',
+            companiesIncluded: cleanedData.length,
+            totalCompaniesWithData: emissionsPerDollar.length,
+            outliersRemoved: outliersRemoved,
+            outlierPercentage: parseFloat(((outliersRemoved/emissionsPerDollar.length)*100).toFixed(2)),
+            standardDeviation: this.calculateStandardDeviation(cleanedData),
+            median: this.calculateMedian(cleanedData),
+            min: Math.min(...cleanedData),
+            max: Math.max(...cleanedData)
+          };
+        } else {
+          this.logger.warn(`${categoryName}: No valid data after outlier removal (started with ${emissionsPerDollar.length} companies)`);
+        }
+      } else {
+        this.logger.warn(`${categoryName}: No companies with valid data for this category`);
       }
     });
     
@@ -2645,8 +2653,36 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   /**
+   * Get summary of companies used in calculations for each category
+   */
+  private getCompaniesUsedSummaryByCategory(companiesByIndustry: Record<string, any[]>): Record<string, any> {
+    const summary: Record<string, any> = {};
+    const ghgCategories = this.getGhgCategoryMappings();
+    
+    Object.entries(companiesByIndustry).forEach(([industry, companies]) => {
+      summary[industry] = {};
+      
+      Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
+        // Calculate how many companies have valid data for this category
+        const emissionsPerDollar = this.calculateEmissionsPerDollarForCategory(companies, fieldName);
+        const cleanedData = this.removeOutliers(emissionsPerDollar);
+        
+        summary[industry][categoryName] = {
+          totalCompaniesInIndustry: companies.length,
+          companiesWithValidData: emissionsPerDollar.length,
+          companiesAfterOutlierRemoval: cleanedData.length,
+          outliersRemoved: emissionsPerDollar.length - cleanedData.length
+        };
+      });
+    });
+    
+    return summary;
+  }
+
+  /**
    * Calculate emissions per dollar for a specific category
    * Converts from tons CO2e to kg CO2e before calculating ratio
+   * IMPORTANT: Only includes companies with valid numeric values for both emissions and revenue
    */
   private calculateEmissionsPerDollarForCategory(companies: any[], fieldName: string): number[] {
     return companies
@@ -2654,6 +2690,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         const emissionsInTons = this.parseNumericValue(company[fieldName]);
         const revenue = this.parseNumericValue(company.revenue);
         
+        // Only calculate ratio if both values are valid positive numbers
         if (emissionsInTons > 0 && revenue > 0) {
           // Convert tons CO2e to kg CO2e (multiply by 1000)
           const emissionsInKg = emissionsInTons * 1000;
@@ -2666,13 +2703,19 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   /**
    * Parse a value to a numeric type safely
+   * Returns 0 for invalid numeric strings to ensure they're filtered out in calculations
    */
   private parseNumericValue(value: any): number {
-    if (typeof value === 'number') {
+    if (typeof value === 'number' && !isNaN(value)) {
       return value;
     }
     if (typeof value === 'string') {
-      const parsed = parseFloat(value);
+      const trimmed = value.trim();
+      // Handle common non-numeric cases that might slip through validation
+      if (trimmed === '' || trimmed.toLowerCase() === 'n/a' || trimmed.toLowerCase() === 'not specified') {
+        return 0;
+      }
+      const parsed = parseFloat(trimmed);
       return isNaN(parsed) ? 0 : parsed;
     }
     return 0;
@@ -2680,6 +2723,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   /**
    * Remove outliers using the Interquartile Range (IQR) method
+   * This operates on emissions per dollar ratios, NOT raw emissions data
    */
   private removeOutliers(data: number[]): number[] {
     if (data.length < 4) {
