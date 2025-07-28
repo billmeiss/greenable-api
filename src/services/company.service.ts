@@ -2411,6 +2411,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   /**
    * Calculate average emissions per dollar for every GHG emission category by industry
    * Only uses companies with complete quantitative data and removes outliers
+   * Results are in kg CO2e per USD (emissions converted from tons to kg)
    */
   async calculateAverageEmissionsByIndustry(): Promise<any> {
     try {
@@ -2626,6 +2627,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       if (cleanedData.length > 0) {
         averages[categoryName] = {
           averageEmissionsPerDollar: this.calculateMean(cleanedData),
+          unit: 'kg CO2e/USD',
           companiesIncluded: cleanedData.length,
           outlierCount: emissionsPerDollar.length - cleanedData.length,
           standardDeviation: this.calculateStandardDeviation(cleanedData),
