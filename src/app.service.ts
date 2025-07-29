@@ -309,7 +309,7 @@ export class AppService {
   }
 
   async updateInconsistentRevenues(): Promise<any> {
-    const allCompanies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500, toRow: 10710 });
+    const allCompanies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10710 });
     let companies = allCompanies;
     
     if (companies.length === 0) {
@@ -341,33 +341,37 @@ export class AppService {
       const batchPromises = batch.map(async (company) => {
         try {
           const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl, category, country } = company;
-          
-          if (revenueAmount && exchangeRateCountry !== 'USD') {
-            const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
-            if (exchangeRate) {
-              const updatedRevenue = revenueAmount / exchangeRate;
-              await this.companyService.updateNewRevenue(name, {
-                revenue: updatedRevenue,
-                currency: 'USD'
-              });
-            } else {
-              const revenueData = await this.companyService.convertCurrencyUsingGemini({
-                revenue: revenueAmount,
-                currency: exchangeRateCountry,
-                year: revenueYear,
-                source: 'Gemini',
-                confidence: 1
-              }, company);
-              await this.companyService.updateNewRevenue(name, {
-                revenue: revenueData.revenue,
-                currency: 'USD',
-                year: revenueYear,
-                source: 'Gemini',
-                confidence: 1
-              });
-            }
+
+          if (revenueUrl!== 'Error occurred during retrieval') {
             return;
           }
+          
+          // if (revenueAmount && exchangeRateCountry !== 'USD') {
+          //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
+          //   if (exchangeRate) {
+          //     const updatedRevenue = revenueAmount / exchangeRate;
+          //     await this.companyService.updateNewRevenue(name, {
+          //       revenue: updatedRevenue,
+          //       currency: 'USD'
+          //     });
+          //   } else {
+          //     const revenueData = await this.companyService.convertCurrencyUsingGemini({
+          //       revenue: revenueAmount,
+          //       currency: exchangeRateCountry,
+          //       year: revenueYear,
+          //       source: 'Gemini',
+          //       confidence: 1
+          //     }, company);
+          //     await this.companyService.updateNewRevenue(name, {
+          //       revenue: revenueData.revenue,
+          //       currency: 'USD',
+          //       year: revenueYear,
+          //       source: 'Gemini',
+          //       confidence: 1
+          //     });
+          //   }
+          //   return;
+          // }
           
           // Check if the revenue source is not Financial Modeling Prep or Vertex AI
           if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
@@ -389,38 +393,38 @@ export class AppService {
           // }
 
           // Update the revenue source to the annual report
-          // const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl, category, country);
-          // console.log(revenue);
+          const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl, category, country);
+          console.log(revenue);
           
-          // if (!revenue || !revenue.revenue) {
-          //   console.log(`[ERROR] No annual report found for ${name}`);
-          //   await this.companyService.updateCompanyRevenue(name, {
-          //     revenue: null,
-          //     year: null,
-          //     source: null,
-          //     sourceUrl: revenue?.sourceUrl || 'Could not find annual report',
-          //     confidence: 1,
-          //   });
-          //   return;
-          // }
+          if (!revenue || !revenue.revenue) {
+            console.log(`[ERROR] No annual report found for ${name}`);
+            await this.companyService.updateCompanyRevenue(name, {
+              revenue: 0,
+              year: revenueYear,
+              source: 'Could not find annual report',
+              sourceUrl: revenue?.sourceUrl || 'Could not find annual report',
+              confidence: 1,
+            });
+            return;
+          }
           
-          // let updatedRevenue = revenue.revenue;
-          // let updatedCurrency = revenue.currency;
+          let updatedRevenue = revenue.revenue;
+          let updatedCurrency = revenue.currency;
           
-          // if (revenue.currency !== 'USD') {
-          //   // Look up the exchange rate for the reporting period in rates.json
-          //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, revenue.currency);
-          //   if (exchangeRate) {
-          //     updatedRevenue = revenue.revenue / exchangeRate;
-          //     updatedCurrency = 'USD';
-          //   }
-          // }
+          if (revenue.currency !== 'USD') {
+            // Look up the exchange rate for the reporting period in rates.json
+            const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, revenue.currency);
+            if (exchangeRate) {
+              updatedRevenue = revenue.revenue / exchangeRate;
+              updatedCurrency = 'USD';
+            }
+          }
           
-          // await this.companyService.updateCompanyRevenue(name, {
-          //   ...revenue,
-          //   revenue: updatedRevenue,
-          //   currency: updatedCurrency
-          // });
+          await this.companyService.updateCompanyRevenue(name, {
+            ...revenue,
+            revenue: updatedRevenue,
+            currency: updatedCurrency
+          });
           
           successfulUpdates++;
           this.logger.log(`Successfully updated revenue for ${name}`);

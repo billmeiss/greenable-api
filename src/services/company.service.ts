@@ -426,6 +426,8 @@ export class CompanyService {
       );
       
       const parsedResponse = this.geminiApiService.safelyParseJson(response);
+
+      console.log(parsedResponse);
       
       if (!parsedResponse?.revenue) {
         return null;
@@ -547,8 +549,6 @@ export class CompanyService {
     try {
       const revenueModel = this.geminiModelService.getModel('revenue');
       const prompt = this.buildGeminiFallbackPrompt(companyName, reportingPeriod, targetYear, companyCategory, country);
-
-      console.log(prompt);
       
       const response = await this.geminiApiService.handleGeminiCall(
         () => revenueModel.generateContent({
@@ -562,11 +562,11 @@ export class CompanyService {
       
       return {
         revenue: parsedResponse.revenue,
-        year: targetYear || 'unknown',
-        source: 'Gemini Model',
-        confidence: parsedResponse.confidence || 5,
-        sourceUrl: null,
-        currency: parsedResponse.currency || 'USD',
+        year: targetYear,
+        source: `${parsedResponse.source} (Gemini Model)`,
+        confidence: parsedResponse.confidence,
+        sourceUrl: parsedResponse.sourceUrl,
+        currency: parsedResponse.currency,
         employeeCount: parsedResponse.employeeCount || null
       };
     } catch (error) {
@@ -646,12 +646,12 @@ export class CompanyService {
       const targetYear = this.extractTargetYear(reportingPeriod);
       
       // First try getting revenue data from Financial Modeling Prep API
-      const fmpRevenueData = await this.getCompanyRevenueFromFMP(companyName, targetYear);
+      // const fmpRevenueData = await this.getCompanyRevenueFromFMP(companyName, targetYear);
       
-      if (this.isValidFmpData(fmpRevenueData, targetYear)) {
-        this.logger.log(`Retrieved revenue data for ${companyName} from FMP API`);
-        return fmpRevenueData;
-      }
+      // if (this.isValidFmpData(fmpRevenueData, targetYear)) {
+      //   this.logger.log(`Retrieved revenue data for ${companyName} from FMP API`);
+      //   return fmpRevenueData;
+      // }
       
       if (reportUrl) {
         this.logger.log(`Extracting financial data from provided report URL for ${companyName}`);
@@ -662,8 +662,6 @@ export class CompanyService {
         }
       }
       
-      // Search for annual report if no reportUrl provided or extraction failed
-      if (!reportUrl) {
         this.logger.log(`Searching for annual report for ${companyName}`);
         const annualReportUrl = await this.searchForCompanyAnnualReport(companyName, targetYear);
         
@@ -674,7 +672,7 @@ export class CompanyService {
             return reportData;
           }
         }
-      }
+      
       
       // Fall back to Gemini model
       this.logger.log(`Using Gemini fallback for financial data for ${companyName}`);
@@ -1631,7 +1629,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
         `Analysed Data!AH${companyIndex + 2}`,
-        [['Annual Report', revenueData.sourceUrl]]
+        [[revenueData.source, revenueData.sourceUrl]]
       );
 
       

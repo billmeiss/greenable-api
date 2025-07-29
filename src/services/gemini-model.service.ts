@@ -673,6 +673,17 @@ Extra-territorial organizations and bodies
       generationConfig: {
         temperature: 0.0,
         tools: [{googleSearch: {}}],
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            revenue: { type: Type.NUMBER },
+            currency: { type: Type.STRING },
+            year: { type: Type.STRING },
+            source: { type: Type.STRING },
+            sourceUrl: { type: Type.STRING },
+            confidence: { type: Type.NUMBER },
+          }
+        }
       },
       systemInstruction:  `You will research and provide accurate financial information about companies.
 
