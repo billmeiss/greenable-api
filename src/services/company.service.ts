@@ -501,6 +501,8 @@ export class CompanyService {
     return `
       Extract financial information for ${companyName} from this document.
       ${targetYear !== 'recent' ? `Focus on data for the year ${targetYear}.` : 'Use the most recent data available.'}
+
+      The name of the company in the doucment must match ${companyName}. If it is a different company, return null.
       
       IMPORTANT INSTRUCTIONS:
       1. Find the total revenue/turnover for the company
@@ -1629,7 +1631,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
         `Analysed Data!AH${companyIndex + 2}`,
-        [[revenueData.source, revenueData.sourceUrl]]
+        [[revenueData.source, revenueData.sourceUrl ?? '']]
       );
 
       
