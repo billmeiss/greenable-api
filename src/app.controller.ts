@@ -143,5 +143,16 @@ export class AppController {
     return this.appService.validateAndFixRevenueSourceUrls(options);
   }
 
+  /**
+   * Compare company names between "Companies to Request" and "Analysed Data" sheets
+   * Uses Gemini AI to intelligently determine if companies with same names but different countries
+   * are actually the same company or different entities
+   * @returns Summary of matched companies that will be added to a new comparison sheet
+   */
+  @Post('/compare-company-names')
+  compareCompanyNames() {
+    return this.appService.compareCompanyNamesBetweenSheets();
+  }
+
   
 }

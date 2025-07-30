@@ -1118,6 +1118,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         revenueYear: row[4], 
         revenue: row[5], 
         exchangeRateCountry: row[6],
+        employeeCount: row[7],
         scope1: row[9],
         scope2Location: row[10],
         scope2Market: row[11],
@@ -2692,7 +2693,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
           ghgCategories: this.getGhgCategoryDefinitions(),
           industryCategories: this.getValidIndustryCategories(),
           revenueRanges: this.getRevenueRanges(),
-          calculationMethod: 'Average emissions per benchmark unit with category-specific outlier removal, segmented by revenue ranges, using only audited companies. Benchmarks: revenue (kg CO2e/USD) for most categories, employee count (kg CO2e/employee) for Categories 1 (office-based), 5, 6, and 7',
+          calculationMethod: 'Average emissions per benchmark unit with category-specific outlier removal, segmented by revenue ranges, using only audited companies. Requires minimum 3 companies per calculation. Benchmarks: revenue (kg CO2e/USD) for most categories, employee count (kg CO2e/employee) for Categories 1 (office-based), 5, 6, and 7',
           dataCompleteness: 'Only audited companies (with third party assurance) included per category based on data availability for that specific category, segmented by revenue to avoid skewing',
           outlierRemovalMethod: 'Interquartile Range (IQR) with 1.0x multiplier (stricter bounds) applied individually to each category within each revenue segment',
           emissionsUnit: 'kg CO2e per USD (revenue-based) or kg CO2e per employee (employee-based), converted from tons CO2e to kg CO2e',
@@ -2703,7 +2704,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
             '   a. Determine benchmark type: employee count for Categories 1 (office-based industries), 5, 6, 7; revenue for all others',
             '   b. Calculate emissions per benchmark unit (USD or employee) for companies with valid data for that category',
             '   c. Remove outliers specific to that category using stricter IQR method (1.0x instead of 1.5x)',
-            '   d. Calculate averages using non-outlier companies for that category within the revenue segment',
+            '   d. Calculate averages using non-outlier companies for that category within the revenue segment (minimum 3 companies required)',
             '4. Companies can be included in some categories but excluded from others based on outlier status',
             '5. Revenue segmentation prevents large companies from skewing averages for smaller companies',
             '6. Employee-based benchmarking for employee-related categories (waste, travel, commuting) and office-based purchased goods/services',
@@ -2946,7 +2947,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         summary[categoryName].companiesAfterOutlierRemoval = cleanedData.length;
         summary[categoryName].outliersRemoved = outliersRemoved;
         
-        if (cleanedData.length > 0) {
+        if (cleanedData.length >= 3) {
           // Log outlier removal for transparency
           if (outliersRemoved > 0) {
             this.logger.debug(`${categoryName} (${benchmarkType}): Removed ${outliersRemoved} outliers from ${emissionsRatios.length} companies (${((outliersRemoved/emissionsRatios.length)*100).toFixed(1)}%)`);
@@ -2968,7 +2969,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
             max: Math.max(...cleanedData)
           };
         } else {
-          this.logger.warn(`${categoryName} (${benchmarkType}): No valid data after outlier removal (started with ${emissionsRatios.length} companies)`);
+          this.logger.warn(`${categoryName} (${benchmarkType}): Insufficient data after outlier removal (${cleanedData.length} companies remaining, minimum 3 required)`);
         }
       } else {
         this.logger.warn(`${categoryName} (${benchmarkType}): No companies with valid data for this category`);
@@ -3641,6 +3642,517 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       this.logger.error(`Error validating revenue source URL for ${companyName}: ${error.message}`);
       // On error, assume the URL is invalid to be safe
       return false;
+    }
+  }
+
+  /**
+   * Compare company names between "Companies to Request" and "Analysed Data" sheets
+   * Uses Gemini AI to intelligently determine if companies with the same names but different countries
+   * are actually the same company or different entities, then outputs results to a new sheet
+   */
+  async compareCompanyNamesBetweenSheets(): Promise<any> {
+    console.log(`[STEP] Starting company name comparison between sheets`);
+    
+    try {
+      // Get companies from both sheets
+      const requestCompanies = await this.getCompaniesFromRequestSheet();
+      const analysedCompanies = await this.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10700 });
+      
+      console.log(`[INFO] Found ${requestCompanies.length} companies in 'Companies to Request' sheet`);
+      console.log(`[INFO] Found ${analysedCompanies.length} companies in 'Analysed Data' sheet`);
+      
+      // Initialize the comparison sheet with headers
+      await this.initializeCompanyComparisonSheet();
+      
+      let totalMatches = 0;
+      const errors = [];
+      const batchSize = 10;
+      
+      console.log(`[BATCHING] Processing ${requestCompanies.length} companies in batches of ${batchSize}`);
+      
+      // Process companies in batches of 10
+      for (let i = 0; i < requestCompanies.length; i += batchSize) {
+        const batch = requestCompanies.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(requestCompanies.length / batchSize);
+        
+        console.log(`[BATCH ${batchNumber}/${totalBatches}] Processing companies ${i + 1}-${Math.min(i + batchSize, requestCompanies.length)} of ${requestCompanies.length}`);
+        
+        // Process each company in the current batch
+        const batchPromises = batch.map(async (requestCompany, index) => {
+          try {
+            const companyIndex = i + index + 1;
+            console.log(`[PROCESSING ${companyIndex}/${requestCompanies.length}] Checking matches for: ${requestCompany.name}`);
+            
+            // Step 1: Use Gemini to find potential matches from the full list
+            const potentialMatches = await this.findPotentialMatchesWithGemini(
+              requestCompany.name, 
+              requestCompany.country, 
+              analysedCompanies
+            );
+            
+            if (potentialMatches.length > 0) {
+              console.log(`[POTENTIAL] Found ${potentialMatches.length} potential matches for ${requestCompany.name}`);
+              
+              // Step 2: Use Gemini to do detailed analysis of each potential match
+              for (const potentialMatch of potentialMatches) {
+                const detailedAnalysis = await this.compareCompaniesWithGemini(
+                  requestCompany.name, 
+                  requestCompany.country, 
+                  potentialMatch.name, 
+                  potentialMatch.country
+                );
+                
+                if (detailedAnalysis.isSameCompany) {
+                  // Immediately append this match to the sheet
+                  await this.appendMatchToSheet({
+                    requestCompanyName: requestCompany.name,
+                    requestCompanyCountry: requestCompany.country,
+                    analysedCompanyName: potentialMatch.name,
+                    analysedCompanyCountry: potentialMatch.country,
+                    confidence: detailedAnalysis.confidence,
+                    reasoning: detailedAnalysis.reasoning
+                  });
+                  
+                  totalMatches++;
+                  console.log(`[CONFIRMED] Match confirmed and added to sheet: ${requestCompany.name} <-> ${potentialMatch.name}`);
+                } else {
+                  console.log(`[REJECTED] Match rejected for ${requestCompany.name} <-> ${potentialMatch.name}: ${detailedAnalysis.reasoning}`);
+                }
+              }
+            } else {
+              console.log(`[NO MATCHES] No potential matches found for ${requestCompany.name}`);
+            }
+          } catch (error) {
+            console.log(`[ERROR] Error processing ${requestCompany.name}: ${error.message}`);
+            errors.push(`Error processing ${requestCompany.name}: ${error.message}`);
+          }
+        });
+        
+        // Wait for all companies in the current batch to complete
+        await Promise.all(batchPromises);
+        
+        console.log(`[BATCH COMPLETE] Finished batch ${batchNumber}/${totalBatches}. Total matches so far: ${totalMatches}`);
+        
+        // Add a small delay between batches to avoid rate limiting
+        if (i + batchSize < requestCompanies.length) {
+          console.log(`[DELAY] Waiting 2 seconds before next batch...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      console.log(`[RESULT] Found ${totalMatches} confirmed matches and added them to the sheet`);
+      
+      return {
+        success: true,
+        message: `Successfully compared ${requestCompanies.length} request companies with ${analysedCompanies.length} analysed companies`,
+        totalRequestCompanies: requestCompanies.length,
+        totalAnalysedCompanies: analysedCompanies.length,
+        totalMatches,
+        errors
+      };
+      
+    } catch (error) {
+      console.log(`[ERROR] Error in company name comparison: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get companies and countries from "Companies to Request" sheet
+   */
+  private async getCompaniesFromRequestSheet(): Promise<Array<{name: string, country: string}>> {
+    console.log(`[STEP] Getting companies and countries from 'Companies to Request' sheet`);
+    
+    try {
+      // Get companies and countries from columns A and B
+      const data = await this.sheetsApiService.getValues(
+        this.SPREADSHEET_ID,
+        "'Companies to Request'!A2:B"
+      );
+      
+      const rows = data.values || [];
+      const companies = rows.map(row => ({
+        name: row[0] || '',
+        country: row[1] || 'Unknown'
+      })).filter(company => company.name.trim() !== '');
+      
+      console.log(`[RESULT] Found ${companies.length} companies in 'Companies to Request' sheet`);
+      return companies;
+    } catch (error) {
+      console.log(`[ERROR] Error getting companies from request sheet: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  /**
+   * Basic company name similarity check (more lenient than the existing isSameCompany method)
+   */
+  private isSameCompanyBasic(company1: string, company2: string): boolean {
+    // Normalize company names
+    const normalize = (name: string) => {
+      return name.toLowerCase()
+        .replace(/\s+/g, '') // Remove spaces
+        .replace(/[,.'"]/g, '') // Remove punctuation
+        .replace(/\b(inc|corp|co|ltd|llc|group|plc|sa|ag|gmbh|srl|spa|bv|nv)\b/g, ''); // Remove common company suffixes
+    };
+    
+    const normalized1 = normalize(company1);
+    const normalized2 = normalize(company2);
+    
+    // Check if the core company names are similar (at least 70% overlap)
+    const shorter = normalized1.length < normalized2.length ? normalized1 : normalized2;
+    const longer = normalized1.length >= normalized2.length ? normalized1 : normalized2;
+    
+    // Check for exact match or if shorter name is contained in longer name
+    return longer.includes(shorter) || this.calculateStringSimilarity(normalized1, normalized2) > 0.7;
+  }
+  
+  /**
+   * Calculate string similarity using Levenshtein distance
+   */
+  private calculateStringSimilarity(str1: string, str2: string): number {
+    const len1 = str1.length;
+    const len2 = str2.length;
+    
+    if (len1 === 0) return len2 === 0 ? 1 : 0;
+    if (len2 === 0) return 0;
+    
+    const matrix = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(null));
+    
+    for (let i = 0; i <= len1; i++) matrix[0][i] = i;
+    for (let j = 0; j <= len2; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= len2; j++) {
+      for (let i = 1; i <= len1; i++) {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j - 1][i] + 1,
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i - 1] + cost
+        );
+      }
+    }
+    
+    const maxLen = Math.max(len1, len2);
+    return (maxLen - matrix[len2][len1]) / maxLen;
+  }
+  
+    /**
+   * Use first-word matching followed by Gemini AI to find potential matches
+   */
+  private async findPotentialMatchesWithGemini(
+    targetCompanyName: string,
+    targetCompanyCountry: string,
+    analysedCompanies: any[]
+  ): Promise<Array<{name: string, country: string}>> {
+    try {
+      // Step 1: Extract first word from target company name and filter analyzed companies
+      const targetFirstWord = this.extractFirstWord(targetCompanyName);
+      console.log(`[FILTERING] Filtering by first word: "${targetFirstWord}" for ${targetCompanyName}`);
+      
+      const firstWordMatches = analysedCompanies.filter(company => {
+        const companyFirstWord = this.extractFirstWord(company.name);
+        return this.compareFirstWords(targetFirstWord, companyFirstWord);
+      });
+      
+      console.log(`[FILTERED] Found ${firstWordMatches.length} companies with matching first words out of ${analysedCompanies.length} total`);
+      
+      if (firstWordMatches.length === 0) {
+        console.log(`[NO MATCHES] No companies found with matching first word for ${targetCompanyName}`);
+        return [];
+      }
+      
+      // Step 2: Use Gemini to analyze only the first-word matches
+      const companyList = firstWordMatches.map((company, index) => 
+        `${index + 1}. ${company.name} (${company.country || 'Unknown'})`
+      ).join('\n');
+
+      const prompt = `
+        I need to find potential matches for a target company from a pre-filtered list of companies that share the same first word.
+        
+        Target Company:
+        - Name: ${targetCompanyName}
+        - Country: ${targetCompanyCountry}
+        
+        Pre-filtered Companies (sharing first word "${targetFirstWord}"):
+        ${companyList}
+        
+        Please identify which companies from this list could potentially be the same as the target company.
+        
+        Consider:
+        1. Similar company names (ignoring corporate suffixes like Inc, Corp, Ltd, SA, GmbH, etc.)
+        2. Companies that could be subsidiaries, branches, or international divisions
+        3. Companies with slight name variations due to legal requirements in different countries
+        4. Don't worry about country differences - multinational companies operate globally
+        
+        Rules:
+        - Only include companies that have a reasonable chance of being the same entity
+        - Be somewhat liberal in your matching to avoid missing legitimate matches
+        - Since these companies already share the same first word, focus on the overall company identity
+        
+        Return your response in JSON format:
+        {
+          "potentialMatches": [
+            {
+              "companyNumber": 1,
+              "reasoning": "brief explanation of why this could be a match"
+            }
+          ]
+        }
+        
+        If no potential matches are found, return: {"potentialMatches": []}
+      `;
+      
+      const result = await this.geminiApiService.handleGeminiCall(
+        () => this.geminiModelService.getModel('companyNameChecker').generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        }),
+        2, // maxRetries
+        1000, // initialDelayMs
+        30000 // timeoutMs - shorter timeout since we're processing smaller lists
+      );
+
+      if (!result) {
+        console.log(`[WARNING] Failed to get Gemini response for finding matches for ${targetCompanyName}`);
+        return [];
+      }
+
+      const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+      
+      console.log(`[GEMINI RESPONSE] for ${targetCompanyName}:`, parsedResponse);
+      
+      if (!parsedResponse || !Array.isArray(parsedResponse.potentialMatches)) {
+        console.log(`[WARNING] Invalid Gemini response format for ${targetCompanyName}`);
+        return [];
+      }
+
+      // Convert the potential matches back to company objects from the first-word filtered list
+      const potentialMatches = parsedResponse.potentialMatches
+        .map(match => {
+          const companyIndex = match.companyNumber - 1; // Convert to 0-based index
+          if (companyIndex >= 0 && companyIndex < firstWordMatches.length) {
+            return {
+              name: firstWordMatches[companyIndex].name,
+              country: firstWordMatches[companyIndex].country || 'Unknown'
+            };
+          }
+          return null;
+        })
+        .filter(Boolean); // Remove null values
+
+      console.log(`[POTENTIAL] Gemini found ${potentialMatches.length} potential matches for ${targetCompanyName} from ${firstWordMatches.length} first-word matches`);
+      
+      return potentialMatches;
+      
+    } catch (error) {
+      console.log(`[ERROR] Error finding potential matches for ${targetCompanyName}: ${error.message}`);
+      return [];
+    }
+  }
+  
+  /**
+   * Extract the first meaningful word from a company name
+   */
+  private extractFirstWord(companyName: string): string {
+    if (!companyName) return '';
+    
+    // Clean and normalize the company name
+    const cleaned = companyName.trim().toLowerCase();
+    
+    // Split by spaces and get the first word
+    const words = cleaned.split(/\s+/);
+    if (words.length > 0) {
+      return words[0];
+    }
+    
+    return cleaned;
+  }
+  
+  /**
+   * Compare two first words to see if they match (with some flexibility)
+   */
+  private compareFirstWords(word1: string, word2: string): boolean {
+    if (!word1 || !word2) return false;
+    
+    const normalize = (word: string) => word.toLowerCase().trim();
+    
+    const normalized1 = normalize(word1);
+    const normalized2 = normalize(word2);
+    
+    // Exact match
+    if (normalized1 === normalized2) return true;
+    
+    // Check if one is contained in the other (for cases like "apple" vs "applecomputer")
+    if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) return true;
+    
+    return false;
+  }
+
+  /**
+   * Use Gemini AI to compare two companies considering their names and countries
+   */
+  private async compareCompaniesWithGemini(
+    company1Name: string, 
+    company1Country: string, 
+    company2Name: string, 
+    company2Country: string
+  ): Promise<{isSameCompany: boolean, confidence: number, reasoning: string}> {
+    try {
+      const prompt = `
+        I need to determine if these two companies are the same entity or different companies.
+        
+        Company 1:
+        - Name: ${company1Name}
+        - Country: ${company1Country}
+        
+        Company 2:
+        - Name: ${company2Name}
+        - Country: ${company2Country}
+        
+        Please analyze whether these represent the same company considering:
+        1. Are the company names the same or very similar (ignoring common corporate suffixes like Inc, Corp, Ltd, etc.)?
+        2. Could these be the same company operating in different countries (e.g., subsidiaries, international branches)?
+        3. Could these be completely different companies that happen to have similar names?
+        4. Are there any obvious indicators that these are different entities?
+        
+        Consider that:
+        - Large multinational companies often have operations in multiple countries
+        - Some companies have similar names but are completely unrelated
+        - Country differences don't automatically mean different companies
+        - Legal entity suffixes may vary by country (Inc vs Ltd vs SA vs GmbH, etc.)
+        
+        Return your response in JSON format:
+        {
+          "isSameCompany": true/false,
+          "confidence": 0-10 (10 being absolutely certain),
+          "reasoning": "detailed explanation of your decision"
+        }
+      `;
+      
+      const result = await this.geminiApiService.handleGeminiCall(
+        () => this.geminiModelService.getModel('companyNameChecker').generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        }),
+        2, // maxRetries
+        1000, // initialDelayMs
+        30000 // timeoutMs
+      );
+
+      if (!result) {
+        console.log(`[WARNING] Failed to get Gemini response for ${company1Name} vs ${company2Name}`);
+        return {
+          isSameCompany: false,
+          confidence: 0,
+          reasoning: "Failed to get AI analysis"
+        };
+      }
+
+      const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+      
+      if (!parsedResponse || typeof parsedResponse.isSameCompany !== 'boolean') {
+        console.log(`[WARNING] Invalid Gemini response for ${company1Name} vs ${company2Name}`);
+        return {
+          isSameCompany: false,
+          confidence: 0,
+          reasoning: "Invalid AI response format"
+        };
+      }
+
+      return {
+        isSameCompany: parsedResponse.isSameCompany,
+        confidence: parsedResponse.confidence || 0,
+        reasoning: parsedResponse.reasoning || "No reasoning provided"
+      };
+      
+    } catch (error) {
+      console.log(`[ERROR] Error in Gemini comparison for ${company1Name} vs ${company2Name}: ${error.message}`);
+      return {
+        isSameCompany: false,
+        confidence: 0,
+        reasoning: `Error during AI analysis: ${error.message}`
+      };
+    }
+  }
+  
+  /**
+   * Initialize the company comparison sheet with headers
+   */
+  private async initializeCompanyComparisonSheet(): Promise<void> {
+    console.log(`[STEP] Initializing company comparison results sheet`);
+    
+    try {
+      // Clear any existing data in the sheet first
+      try {
+        await this.sheetsApiService.clearValues(
+          this.SPREADSHEET_ID,
+          "'Company Name Matches'!A:G"
+        );
+      } catch (clearError) {
+        // If clearing fails, it might be because the sheet doesn't exist yet, which is fine
+        console.log(`[INFO] Could not clear existing data (sheet may not exist yet): ${clearError.message}`);
+      }
+      
+      // Prepare header row
+      const headers = [
+        'Request Company Name',
+        'Request Company Country', 
+        'Analysed Company Name',
+        'Analysed Company Country',
+        'AI Confidence (0-10)',
+        'AI Reasoning',
+        'Comparison Date'
+      ];
+      
+      // Add headers to the sheet
+      await this.sheetsApiService.appendValues(
+        this.SPREADSHEET_ID,
+        "'Company Name Matches'!A1",
+        [headers]
+      );
+      
+      console.log(`[SUCCESS] Initialized 'Company Name Matches' sheet with headers`);
+      
+    } catch (error) {
+      console.log(`[ERROR] Error initializing comparison sheet: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  /**
+   * Append a single match to the company comparison sheet
+   */
+  private async appendMatchToSheet(match: {
+    requestCompanyName: string;
+    requestCompanyCountry: string;
+    analysedCompanyName: string;
+    analysedCompanyCountry: string;
+    confidence: number;
+    reasoning: string;
+  }): Promise<void> {
+    try {
+      const rowData = [
+        match.requestCompanyName,
+        match.requestCompanyCountry,
+        match.analysedCompanyName, 
+        match.analysedCompanyCountry,
+        match.confidence,
+        match.reasoning,
+        new Date().toISOString().split('T')[0] // Current date in YYYY-MM-DD format
+      ];
+      
+      // Append the single match to the sheet
+      await this.sheetsApiService.appendValues(
+        this.SPREADSHEET_ID,
+        "'Company Name Matches'!A2",
+        [rowData]
+      );
+      
+      console.log(`[SUCCESS] Appended match to sheet: ${match.requestCompanyName} <-> ${match.analysedCompanyName}`);
+      
+    } catch (error) {
+      console.log(`[ERROR] Error appending match to sheet: ${error.message}`);
+      throw error;
     }
   }
 }

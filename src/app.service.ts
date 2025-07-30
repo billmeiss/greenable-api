@@ -242,7 +242,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 3450, toRow: 5500 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 4265, toRow: 5500 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
@@ -742,11 +742,13 @@ export class AppService {
   }
 
   /**
-   * Calculate average emissions per dollar for every GHG emission category by industry
+   * Calculate average emissions per benchmark unit for every GHG emission category by industry
+   * Uses revenue benchmarking (kg CO2e/USD) for most categories and employee benchmarking (kg CO2e/employee) 
+   * for specific categories (Categories 1 for office-based industries, 5, 6, and 7)
    */
   async calculateAverageEmissionsByIndustry(): Promise<any> {
     try {
-      this.logger.log('Starting calculation of average emissions per dollar by industry');
+      this.logger.log('Starting calculation of average emissions per benchmark unit by industry');
       const result = await this.companyService.calculateAverageEmissionsByIndustry();
       
       this.logger.log(`Average emissions calculation completed for ${Object.keys(result.industries || {}).length} industries`);
@@ -932,6 +934,32 @@ export class AppService {
         totalCompanies: 0,
         validatedCompanies: 0,
         correctedCompanies: 0,
+        errors: [error.message]
+      };
+    }
+  }
+
+  /**
+   * Compare company names between "Companies to Request" and "Analysed Data" sheets
+   * Uses Gemini AI to intelligently determine if companies with the same names but different countries
+   * are actually the same company or different entities
+   */
+  async compareCompanyNamesBetweenSheets(): Promise<any> {
+    this.logger.log('Starting company name comparison between sheets');
+    
+    try {
+      const result = await this.companyService.compareCompanyNamesBetweenSheets();
+      
+      this.logger.log(`Company name comparison completed successfully. Found ${result.matchedCompanies?.length || 0} potential matches`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in company name comparison: ${error.message}`);
+      return {
+        success: false,
+        message: `Error comparing company names: ${error.message}`,
+        matchedCompanies: [],
+        totalRequestCompanies: 0,
+        totalAnalysedCompanies: 0,
         errors: [error.message]
       };
     }
