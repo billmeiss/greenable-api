@@ -2416,9 +2416,11 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   /**
-   * Calculate average emissions per dollar for every GHG emission category by industry
-   * Processes each category individually and removes outliers specific to each category
-   * Results are in kg CO2e per USD (emissions converted from tons to kg)
+   * Calculate average emissions per benchmark unit for every GHG emission category by industry
+   * Uses revenue benchmarking (kg CO2e/USD) for most categories and employee benchmarking (kg CO2e/employee) 
+   * for Categories 1 (office-based), 5, 6, and 7. Processes each category individually and removes outliers 
+   * specific to each category. Results are in kg CO2e per USD or kg CO2e per employee 
+   * (emissions converted from tons to kg)
    */
   async calculateAverageEmissionsByIndustry(): Promise<any> {
     try {
@@ -2435,10 +2437,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const companiesByIndustryAndRevenue = this.groupCompaniesByIndustryFromSchema(companiesWithBasicData);
       
       // Calculate averages for each industry, revenue range, and category individually with outlier removal
-      const industryAverages = this.calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue);
-      
-      // Get summary of companies used in calculations for each category
-      const companiesUsedSummary = this.getCompaniesUsedSummaryByCategory(companiesByIndustryAndRevenue);
+      // This now also tracks summary data during processing to avoid duplicate calculations
+      const { results: industryAverages, summary: companiesUsedSummary } = this.calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue);
       
       return {
         success: true,
@@ -2451,20 +2451,22 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
           ghgCategories: this.getGhgCategoryDefinitions(),
           industryCategories: this.getValidIndustryCategories(),
           revenueRanges: this.getRevenueRanges(),
-          calculationMethod: 'Average emissions per dollar (kg CO2e/USD) with category-specific outlier removal, segmented by revenue ranges, using only audited companies',
+          calculationMethod: 'Average emissions per benchmark unit with category-specific outlier removal, segmented by revenue ranges, using only audited companies. Benchmarks: revenue (kg CO2e/USD) for most categories, employee count (kg CO2e/employee) for Categories 1 (office-based), 5, 6, and 7',
           dataCompleteness: 'Only audited companies (with third party assurance) included per category based on data availability for that specific category, segmented by revenue to avoid skewing',
           outlierRemovalMethod: 'Interquartile Range (IQR) with 1.0x multiplier (stricter bounds) applied individually to each category within each revenue segment',
-          emissionsUnit: 'kg CO2e per USD (converted from tons CO2e to kg CO2e)',
+          emissionsUnit: 'kg CO2e per USD (revenue-based) or kg CO2e per employee (employee-based), converted from tons CO2e to kg CO2e',
           calculationFlow: [
-            '1. Filter companies with basic data (name, industry category from CATEGORY_SCHEMA, revenue) AND third party assurance (audited companies only)',
+            '1. Filter companies with basic data (name, industry category from CATEGORY_SCHEMA, revenue, employee count for applicable categories) AND third party assurance (audited companies only)',
             '2. Group companies by industry category AND revenue range (0-50M, 50M-250M, 250M-1B, 1B+)',
             '3. For each industry, revenue range, and each GHG category:',
-            '   a. Calculate emissions per dollar for companies with valid data for that category',
-            '   b. Remove outliers specific to that category using stricter IQR method (1.0x instead of 1.5x)',
-            '   c. Calculate averages using non-outlier companies for that category within the revenue segment',
+            '   a. Determine benchmark type: employee count for Categories 1 (office-based industries), 5, 6, 7; revenue for all others',
+            '   b. Calculate emissions per benchmark unit (USD or employee) for companies with valid data for that category',
+            '   c. Remove outliers specific to that category using stricter IQR method (1.0x instead of 1.5x)',
+            '   d. Calculate averages using non-outlier companies for that category within the revenue segment',
             '4. Companies can be included in some categories but excluded from others based on outlier status',
             '5. Revenue segmentation prevents large companies from skewing averages for smaller companies',
-            '6. Only audited companies (with third party assurance) are included for data quality assurance'
+            '6. Employee-based benchmarking for employee-related categories (waste, travel, commuting) and office-based purchased goods/services',
+            '7. Only audited companies (with third party assurance) are included for data quality assurance'
           ]
         }
       };
@@ -2485,7 +2487,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       if (!hasBasicData) return false;
       
       // Must have valid revenue for calculations
-      const hasValidRevenue = this.isValidValue(company.revenue);
+      const hasValidRevenue = this.isValidValue(company.revenue) && company.revenueSource !== 'Could not find annual report' && !company.revenueSource.includes('Gemini');
       if (!hasValidRevenue) return false;
       
       // Must have a valid industry category from CATEGORY_SCHEMA
@@ -2628,13 +2630,15 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   /**
    * Calculate industry averages for each category individually with category-specific outlier removal
-   * Now segments by revenue ranges to avoid skewing
+   * Now segments by revenue ranges to avoid skewing and tracks summary data during processing
    */
-  private calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue: Record<string, Record<string, any[]>>): Record<string, any> {
+  private calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue: Record<string, Record<string, any[]>>): { results: Record<string, any>; summary: Record<string, any> } {
     const results: Record<string, any> = {};
+    const companiesUsedSummary: Record<string, any> = {};
     
     Object.entries(companiesByIndustryAndRevenue).forEach(([industry, revenueRanges]) => {
       results[industry] = {};
+      companiesUsedSummary[industry] = {};
       
       Object.entries(revenueRanges).forEach(([revenueRange, companies]) => {
         if (companies.length < 3) {
@@ -2643,96 +2647,103 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
           return;
         }
         
-        results[industry][revenueRange] = this.calculateIndustryAveragesWithCategorySpecificOutliers(companies);
+        const { averages, summary } = this.calculateIndustryAveragesWithCategorySpecificOutliers(companies, industry);
+        results[industry][revenueRange] = averages;
+        companiesUsedSummary[industry][revenueRange] = summary;
       });
       
       // Remove empty industry entries
       if (Object.keys(results[industry]).length === 0) {
         delete results[industry];
+        delete companiesUsedSummary[industry];
       }
     });
     
-    return results;
+    return {
+      results,
+      summary: companiesUsedSummary
+    };
   }
 
   /**
    * Calculate averages for a single industry across all GHG categories with category-specific outlier removal
+   * Returns both averages and summary data to avoid duplicate calculations
+   * Uses appropriate benchmarking (revenue vs employee count) based on category and industry type
    */
-  private calculateIndustryAveragesWithCategorySpecificOutliers(companies: any[]): any {
+  private calculateIndustryAveragesWithCategorySpecificOutliers(companies: any[], industryCategory: string): { averages: any; summary: Record<string, any> } {
     const ghgCategories = this.getGhgCategoryMappings();
     const averages: Record<string, any> = {};
+    const summary: Record<string, any> = {};
     
     Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
-      // Calculate emissions per dollar ratios for companies with valid data for this category
-      const emissionsPerDollar = this.calculateEmissionsPerDollarForCategory(companies, fieldName);
+      // Determine which benchmark to use for this category and industry
+      const useEmployeeBenchmark = this.shouldUseEmployeeBenchmark(categoryName, industryCategory);
       
-      if (emissionsPerDollar.length > 0) {
+      // Calculate emissions ratios using appropriate benchmark
+      const emissionsRatios = useEmployeeBenchmark 
+        ? this.calculateEmissionsPerEmployeeForCategory(companies, fieldName)
+        : this.calculateEmissionsPerDollarForCategory(companies, fieldName);
+      
+      const benchmarkUnit = useEmployeeBenchmark ? 'kg CO2e/employee' : 'kg CO2e/USD';
+      const benchmarkType = useEmployeeBenchmark ? 'employee' : 'revenue';
+      
+      // Track summary data for this category
+      summary[categoryName] = {
+        totalCompaniesInSegment: companies.length,
+        companiesWithValidData: emissionsRatios.length,
+        companiesAfterOutlierRemoval: 0,
+        outliersRemoved: 0,
+        benchmarkType: benchmarkType
+      };
+      
+      if (emissionsRatios.length > 0) {
         // Remove outliers specific to this category
-        const cleanedData = this.removeOutliers(emissionsPerDollar);
-        const outliersRemoved = emissionsPerDollar.length - cleanedData.length;
+        const cleanedData = this.removeOutliers(emissionsRatios);
+        const outliersRemoved = emissionsRatios.length - cleanedData.length;
+        
+        // Update summary with actual outlier data
+        summary[categoryName].companiesAfterOutlierRemoval = cleanedData.length;
+        summary[categoryName].outliersRemoved = outliersRemoved;
         
         if (cleanedData.length > 0) {
           // Log outlier removal for transparency
           if (outliersRemoved > 0) {
-            this.logger.debug(`${categoryName}: Removed ${outliersRemoved} outliers from ${emissionsPerDollar.length} companies (${((outliersRemoved/emissionsPerDollar.length)*100).toFixed(1)}%)`);
+            this.logger.debug(`${categoryName} (${benchmarkType}): Removed ${outliersRemoved} outliers from ${emissionsRatios.length} companies (${((outliersRemoved/emissionsRatios.length)*100).toFixed(1)}%)`);
           }
           
+          const averageKey = useEmployeeBenchmark ? 'averageEmissionsPerEmployee' : 'averageEmissionsPerDollar';
+          
           averages[categoryName] = {
-            averageEmissionsPerDollar: this.calculateMean(cleanedData),
-            unit: 'kg CO2e/USD',
+            [averageKey]: this.calculateMean(cleanedData),
+            unit: benchmarkUnit,
+            benchmarkType: benchmarkType,
             companiesIncluded: cleanedData.length,
-            totalCompaniesWithData: emissionsPerDollar.length,
+            totalCompaniesWithData: emissionsRatios.length,
             outliersRemoved: outliersRemoved,
-            outlierPercentage: parseFloat(((outliersRemoved/emissionsPerDollar.length)*100).toFixed(2)),
+            outlierPercentage: parseFloat(((outliersRemoved/emissionsRatios.length)*100).toFixed(2)),
             standardDeviation: this.calculateStandardDeviation(cleanedData),
             median: this.calculateMedian(cleanedData),
             min: Math.min(...cleanedData),
             max: Math.max(...cleanedData)
           };
         } else {
-          this.logger.warn(`${categoryName}: No valid data after outlier removal (started with ${emissionsPerDollar.length} companies)`);
+          this.logger.warn(`${categoryName} (${benchmarkType}): No valid data after outlier removal (started with ${emissionsRatios.length} companies)`);
         }
       } else {
-        this.logger.warn(`${categoryName}: No companies with valid data for this category`);
+        this.logger.warn(`${categoryName} (${benchmarkType}): No companies with valid data for this category`);
       }
     });
     
     return {
-      totalCompanies: companies.length,
-      categories: averages
+      averages: {
+        totalCompanies: companies.length,
+        categories: averages
+      },
+      summary
     };
   }
 
-  /**
-   * Get summary of companies used in calculations for each category, segmented by revenue range
-   */
-  private getCompaniesUsedSummaryByCategory(companiesByIndustryAndRevenue: Record<string, Record<string, any[]>>): Record<string, any> {
-    const summary: Record<string, any> = {};
-    const ghgCategories = this.getGhgCategoryMappings();
-    
-    Object.entries(companiesByIndustryAndRevenue).forEach(([industry, revenueRanges]) => {
-      summary[industry] = {};
-      
-      Object.entries(revenueRanges).forEach(([revenueRange, companies]) => {
-        summary[industry][revenueRange] = {};
-        
-        Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
-          // Calculate how many companies have valid data for this category
-          const emissionsPerDollar = this.calculateEmissionsPerDollarForCategory(companies, fieldName);
-          const cleanedData = this.removeOutliers(emissionsPerDollar);
-          
-          summary[industry][revenueRange][categoryName] = {
-            totalCompaniesInSegment: companies.length,
-            companiesWithValidData: emissionsPerDollar.length,
-            companiesAfterOutlierRemoval: cleanedData.length,
-            outliersRemoved: emissionsPerDollar.length - cleanedData.length
-          };
-        });
-      });
-    });
-    
-    return summary;
-  }
+
 
   /**
    * Calculate emissions per dollar for a specific category
@@ -3255,5 +3266,69 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       this.logger.error(`Error updating revenue data for ${companyName}: ${error.message}`);
       return false;
     }
+  }
+
+  /**
+   * Calculate emissions per employee for a specific category/field
+   */
+  private calculateEmissionsPerEmployeeForCategory(companies: any[], fieldName: string): number[] {
+    return companies
+      .filter(company => {
+        // Must have valid emissions data for this category and employee count
+        const emissionsValue = this.parseNumericValue(company[fieldName]);
+        const employeeCount = this.parseNumericValue(company.employeeCount);
+        return this.isValidValue(emissionsValue) && this.isValidValue(employeeCount) && employeeCount > 0;
+      })
+      .map(company => {
+        const emissionsValue = this.parseNumericValue(company[fieldName]);
+        const employeeCount = this.parseNumericValue(company.employeeCount);
+        // Convert tons to kg and calculate per employee
+        return (emissionsValue * 1000) / employeeCount;
+      });
+  }
+
+  /**
+   * Determine if an industry should be considered office-based for Category 1 benchmarking
+   */
+  private isOfficeBased(industryCategory: string): boolean {
+    const officeBasedIndustries = [
+      'Financial intermediation services, except insurance and pension funding services',
+      'Insurance and pension funding services, except compulsory social security services',
+      'Services auxiliary to financial intermediation',
+      'Financial services nec',
+      'Research and development services',
+      'Public administration and defence services; compulsory social security services',
+      'Education services',
+      'Health and social work services',
+      'Membership organisation services n.e.c.',
+      'Recreational, cultural and sporting services',
+      'Other services',
+      'Supporting and auxiliary transport services; travel agency services'
+    ];
+    
+    return officeBasedIndustries.includes(industryCategory);
+  }
+
+  /**
+   * Determine whether to use employee count or revenue as benchmark for a specific category
+   */
+  private shouldUseEmployeeBenchmark(categoryName: string, industryCategory: string): boolean {
+    // Categories that should always use employee benchmarking
+    const alwaysEmployeeBased = [
+      'scope3_cat5_waste_generated',
+      'scope3_cat6_business_travel', 
+      'scope3_cat7_employee_commuting'
+    ];
+    
+    if (alwaysEmployeeBased.includes(categoryName)) {
+      return true;
+    }
+    
+    // Category 1 (purchased goods and services) only for office-based industries
+    if (categoryName === 'scope3_cat1_purchased_goods_services') {
+      return this.isOfficeBased(industryCategory);
+    }
+    
+    return false;
   }
 }
