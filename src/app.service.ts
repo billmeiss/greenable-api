@@ -781,6 +781,161 @@ export class AppService {
       };
     }
   }
+
+  /**
+   * Validate revenue source URLs and retry extraction if they don't refer to the correct company
+   * 
+   * This method:
+   * 1. Gets companies from the spreadsheet with valid revenue source URLs
+   * 2. Uses Gemini AI to validate if each URL actually contains financial data for the correct company
+   * 3. If a URL doesn't refer to the correct company, retries revenue extraction using the company's report URL
+   * 4. Updates the revenue data with corrected information if successful
+   * 
+   * @param options Configuration options for the validation process
+   * @param options.fromRow Optional start row number in the spreadsheet
+   * @param options.toRow Optional end row number in the spreadsheet  
+   * @param options.batchSize Number of companies to process in parallel (default: 5)
+   * @returns Promise<any> Summary object with validation results and statistics
+   */
+  async validateAndFixRevenueSourceUrls({ fromRow = 2, toRow = 10700, batchSize = 5 }: { fromRow?: number, toRow?: number, batchSize?: number } = {}): Promise<any> {
+    try {
+      this.logger.log('Starting revenue source URL validation and correction process');
+      
+      const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow, toRow });
+      
+      // Filter companies that have revenue source URLs to validate
+      const companiesWithRevenueUrls = companies.filter(company => 
+        company.revenueUrl && 
+        company.revenueUrl !== 'Error occurred during retrieval' &&
+        company.revenueUrl !== 'Could not find annual report' &&
+        company.revenueUrl.startsWith('http') && !company.revenueUrl.includes('https://financialmodelingprep.com') && !company.revenueSource.includes('Gemini') && !company.revenueSource.includes('vertexai')
+      );
+      
+      if (companiesWithRevenueUrls.length === 0) {
+        this.logger.log('No companies found with valid revenue source URLs to validate');
+        return {
+          success: true,
+          message: 'No companies found with valid revenue source URLs to validate',
+          totalCompanies: 0,
+          validatedCompanies: 0,
+          correctedCompanies: 0,
+          errors: []
+        };
+      }
+      
+      this.logger.log(`Found ${companiesWithRevenueUrls.length} companies with revenue source URLs to validate`);
+      
+      let validatedCompanies = 0;
+      let correctedCompanies = 0;
+      const errors = [];
+      
+      // Process companies in batches to avoid overwhelming the system
+      for (let i = 0; i < companiesWithRevenueUrls.length; i += batchSize) {
+        const batch = companiesWithRevenueUrls.slice(i, i + batchSize);
+        
+        this.logger.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(companiesWithRevenueUrls.length / batchSize)} (${batch.length} companies)`);
+        
+        const batchPromises = batch.map(async (company) => {
+          try {
+            const { name, revenueUrl, reportingPeriod, reportUrl, category, country } = company;
+            
+            this.logger.log(`Validating revenue source URL for ${name}: ${revenueUrl}`);
+            
+            // Use Gemini to validate if the revenue source URL refers to the correct company
+            const isValidUrl = await this.companyService.validateRevenueSourceUrl(name, revenueUrl);
+            
+            validatedCompanies++;
+            
+            if (isValidUrl) {
+              this.logger.log(`Revenue source URL is valid for ${name}`);
+              return { success: true, company: name, action: 'validated', corrected: false };
+            } else {
+              this.logger.warn(`Revenue source URL does not refer to ${name}, retrying revenue extraction`);
+              
+              // Extract target year from reporting period
+              const targetYear = this.companyService.extractYearFromPeriod(reportingPeriod);
+              
+              // Retry getting revenue for this company
+              const newRevenueData = await this.companyService.getCompanyRevenue(
+                name, 
+                reportingPeriod, 
+                reportUrl, 
+                category, 
+                country
+              );
+              
+              if (newRevenueData) {
+                // Update with the new revenue data
+                await this.companyService.updateCompanyRevenue(name, newRevenueData);
+                correctedCompanies++;
+                
+                this.logger.log(`Successfully corrected revenue data for ${name}`);
+                return { 
+                  success: true, 
+                  company: name, 
+                  action: 'corrected', 
+                  corrected: true,
+                  oldUrl: revenueUrl,
+                  newUrl: newRevenueData.sourceUrl,
+                  newRevenue: newRevenueData.revenue
+                };
+              } else {
+                this.logger.error(`Failed to extract new revenue data for ${name}`);
+                return { 
+                  success: false, 
+                  company: name, 
+                  action: 'failed_correction',
+                  corrected: false,
+                  error: 'Failed to extract new revenue data'
+                };
+              }
+            }
+          } catch (error) {
+            this.logger.error(`Error processing ${company.name}: ${error.message}`);
+            errors.push(`${company.name}: ${error.message}`);
+            return { 
+              success: false, 
+              company: company.name, 
+              action: 'error',
+              corrected: false,
+              error: error.message 
+            };
+          }
+        });
+        
+        // Wait for all companies in the current batch to complete
+        await Promise.all(batchPromises);
+        
+        // Add a small delay between batches to avoid rate limiting
+        if (i + batchSize < companiesWithRevenueUrls.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      const summary = {
+        success: errors.length === 0,
+        message: `Validated ${validatedCompanies} companies, corrected ${correctedCompanies} revenue sources`,
+        totalCompanies: companiesWithRevenueUrls.length,
+        validatedCompanies,
+        correctedCompanies,
+        errors
+      };
+      
+      this.logger.log(`Revenue source validation completed: ${JSON.stringify(summary)}`);
+      return summary;
+      
+    } catch (error) {
+      this.logger.error(`Error in revenue source URL validation: ${error.message}`);
+      return {
+        success: false,
+        message: `Error in revenue source URL validation: ${error.message}`,
+        totalCompanies: 0,
+        validatedCompanies: 0,
+        correctedCompanies: 0,
+        errors: [error.message]
+      };
+    }
+  }
 }
 
 

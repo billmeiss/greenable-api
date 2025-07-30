@@ -124,5 +124,24 @@ export class AppController {
     return this.appService.fixRevenueSourceErrors();
   }
 
+  /**
+   * Validate revenue source URLs and retry revenue extraction if they don't refer to the correct company
+   * @param options Configuration options for the validation process
+   * @param options.fromRow Start row number in the spreadsheet (optional)
+   * @param options.toRow End row number in the spreadsheet (optional)
+   * @param options.batchSize Number of companies to process in parallel (default: 5)
+   * @returns Summary of validation results including corrected companies
+   */
+  @Post('/validate-revenue-source-urls')
+  validateAndFixRevenueSourceUrls(
+    @Body() options: {
+      fromRow?: number;
+      toRow?: number;
+      batchSize?: number;
+    } = {}
+  ) {
+    return this.appService.validateAndFixRevenueSourceUrls(options);
+  }
+
   
 }

@@ -667,6 +667,23 @@ Extra-territorial organizations and bodies
       },
     }
 
+    this.modelConfigs.revenueSourceValidator = {
+      model: 'gemini-2.5-flash-lite',
+      generationConfig: {
+        temperature: 0.0,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isValid: { type: Type.BOOLEAN },
+            confidence: { type: Type.NUMBER },
+            companyMentioned: { type: Type.STRING },
+            reasoning: { type: Type.STRING },
+          }
+        }
+      },
+    }
+
     // Revenue model
     this.modelConfigs.revenue = {
       model: 'gemini-2.5-pro',

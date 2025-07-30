@@ -376,36 +376,277 @@ export class CompanyService {
   }
 
   async searchForCompanyAnnualReport(companyName: string, year: string): Promise<string | null> {
-    const searchResults = await this.searchService.performWebSearch(`${companyName} ${year} annual report revenue pdf`);
+    try {
+      this.logger.log(`Searching for annual report for ${companyName} in ${year}`);
+      
+      // Try multiple search strategies in order of specificity
+      const searchStrategies = this.buildAnnualReportSearchQueries(companyName, year);
+      
+      for (const searchQuery of searchStrategies) {
+        this.logger.log(`Trying search query: ${searchQuery}`);
+        
+        const searchResults = await this.searchService.performWebSearch(searchQuery);
+        
+        if (!searchResults || searchResults.length === 0) {
+          continue;
+        }
+        
+        // Remove duplicates and prioritize results
+        const uniqueResults = this.removeDuplicateSearchResults(searchResults);
+        const prioritizedResults = this.prioritizeAnnualReportResults(uniqueResults, companyName, year);
+        
+        if (prioritizedResults.length === 0) {
+          continue;
+        }
+        
+        // Verify which URL contains the best annual report
+        const bestReportUrl = await this.verifyBestAnnualReport(prioritizedResults, companyName, year);
+        
+        if (bestReportUrl) {
+          this.logger.log(`Found valid annual report for ${companyName}: ${bestReportUrl}`);
+          return bestReportUrl;
+        }
+      }
+      
+      this.logger.warn(`No valid annual report found for ${companyName} in ${year}`);
+      return null;
+      
+    } catch (error) {
+      this.logger.error(`Error searching for annual report for ${companyName}: ${error.message}`);
+      return null;
+    }
+  }
 
-    // Use gemini to check which one is the annual report based ont the results
-    const result = await this.geminiApiService.handleGeminiCall(
-      () => this.geminiModelService.getModel('annualReportFinder').generateContent({
-        contents: [{ role: 'user', parts: [{ text: `I need to find the annual report for ${companyName} in ${year}. Please return the link to the annual report, or a document containing its revenue in the JSON format. The results are: ${searchResults.map(result => result.link).join(', ')}. If you cannot find the annual report, return null.` }] }],
+  /**
+   * Build multiple search query strategies for finding annual reports
+   */
+  private buildAnnualReportSearchQueries(companyName: string, year: string): string[] {
+    const normalizedCompanyName = this.normalizeCompanyNameForSearch(companyName);
+    
+    return [
+      // Most specific: intext searches for exact terms
+      `intext:"${normalizedCompanyName}" intext:"annual report" intext:"${year}" intext:"revenue" filetype:pdf`,
+      `intext:"${normalizedCompanyName}" intext:"10-K" intext:"${year}" filetype:pdf`,
+      
+      // Medium specificity: structured searches
+      `"${normalizedCompanyName}" "${year}" annual report revenue pdf`,
+      `"${normalizedCompanyName}" "${year}" "annual report" financial results`,
+      `"${normalizedCompanyName}" "${year}" 10-K SEC filing`,
+      
+      // Broader searches
+      `${normalizedCompanyName} ${year} annual report financial statement`,
+      `${normalizedCompanyName} ${year} yearly revenue earnings`,
+      
+      // Fallback searches
+      `${normalizedCompanyName} ${year} investor relations annual`,
+      `${normalizedCompanyName} ${year} financial results revenue`
+    ];
+  }
+
+  /**
+   * Remove duplicate search results based on URL
+   */
+  private removeDuplicateSearchResults(results: any[]): any[] {
+    const seenUrls = new Set<string>();
+    return results.filter(result => {
+      const url = result.link?.toLowerCase() || '';
+      if (seenUrls.has(url)) {
+        return false;
+      }
+      seenUrls.add(url);
+      return true;
+    });
+  }
+
+  /**
+   * Prioritize search results that are likely annual reports with revenue data
+   */
+  private prioritizeAnnualReportResults(results: any[], companyName: string, year: string): any[] {
+    const ANNUAL_REPORT_KEYWORDS = ['annual', 'report', '10-k', 'yearly', 'financial', 'investor'];
+    const REVENUE_KEYWORDS = ['revenue', 'earnings', 'income', 'financial', 'results'];
+    const TRUSTED_DOMAINS = ['sec.gov', 'investor', 'ir.', 'annualreports'];
+    
+    const companyKeywords = companyName.toLowerCase().split(/\s+/);
+    
+    return results
+      .map(result => {
+        let score = 0;
+        const title = result.title?.toLowerCase() || '';
+        const snippet = result.snippet?.toLowerCase() || '';
+        const link = result.link?.toLowerCase() || '';
+        const displayedLink = result.displayed_link?.toLowerCase() || '';
+        
+        // Direct PDF files get highest priority
+        if (link.endsWith('.pdf')) {
+          score += 15;
+        }
+        
+        // Check for PDF mention
+        if (title.includes('pdf') || link.includes('pdf')) {
+          score += 8;
+        }
+        
+        // Annual report keywords
+        ANNUAL_REPORT_KEYWORDS.forEach(keyword => {
+          if (title.includes(keyword)) score += 5;
+          if (snippet.includes(keyword)) score += 3;
+          if (link.includes(keyword)) score += 2;
+        });
+        
+        // Revenue/financial keywords
+        REVENUE_KEYWORDS.forEach(keyword => {
+          if (title.includes(keyword)) score += 4;
+          if (snippet.includes(keyword)) score += 2;
+          if (link.includes(keyword)) score += 1;
+        });
+        
+        // Company name relevance
+        companyKeywords.forEach(keyword => {
+          if (keyword.length > 2) { // Skip very short words
+            if (title.includes(keyword)) score += 3;
+            if (displayedLink.includes(keyword)) score += 2;
+            if (link.includes(keyword)) score += 1;
+          }
+        });
+        
+        // Year relevance
+        if (title.includes(year)) score += 6;
+        if (snippet.includes(year)) score += 4;
+        if (link.includes(year)) score += 3;
+        
+        // Trusted domains
+        TRUSTED_DOMAINS.forEach(domain => {
+          if (link.includes(domain) || displayedLink.includes(domain)) {
+            score += 7;
+          }
+        });
+        
+        // Penalize irrelevant sources
+        if (link.includes('wikipedia') || link.includes('news') || link.includes('blog')) {
+          score -= 5;
+        }
+        
+        return { ...result, score };
       })
-    );
+      .filter(result => result.score > 0) // Only keep results with positive scores
+      .sort((a, b) => b.score - a.score) // Sort by score descending
+      .slice(0, 8); // Take top 8 results
+  }
 
-    let parsedResponse = this.geminiApiService.safelyParseJson(result?.candidates[0]?.content?.parts[0]?.text);
-
-    console.log(result);
-
-    if (!parsedResponse || !parsedResponse.annualReportUrl) {
-      // Try again with a different search query
-      const searchResults = await this.searchService.performWebSearch(`${companyName} ${year} revenue`);
+  /**
+   * Use Gemini AI to verify which URL contains the best annual report for revenue data
+   */
+  private async verifyBestAnnualReport(
+    searchResults: any[], 
+    companyName: string, 
+    year: string
+  ): Promise<string | null> {
+    if (!searchResults || searchResults.length === 0) {
+      return null;
+    }
+    
+    const candidateUrls = searchResults.map(result => ({
+      url: result.link,
+      title: result.title || '',
+      snippet: result.snippet || '',
+      score: result.score || 0
+    }));
+    
+    const prompt = this.buildAnnualReportVerificationPrompt(companyName, year, candidateUrls);
+    
+    try {
       const result = await this.geminiApiService.handleGeminiCall(
         () => this.geminiModelService.getModel('annualReportFinder').generateContent({
-          contents: [{ role: 'user', parts: [{ text: `I need to find the revenue for ${companyName} in ${year}. Please return the link to any website or document containing or referencing its revenue in the JSON format. It can be an external website, press release or a document on the company's website. The results are: ${searchResults.map(result => { return `link: ${result.link} - title: ${result.title} - snippet: ${result.snippet}` }).join(', ')}. If you cannot find any relevant report with revenue, return the most likely link to the annual report.` }] }],
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
         })
       );
-      console.log(result?.candidates[0]?.content?.parts[0]?.text);
-      parsedResponse = this.geminiApiService.safelyParseJson(result?.candidates[0]?.content?.parts[0]?.text);
-
-      if (!parsedResponse || !parsedResponse.annualReportUrl) {
+      
+      if (!result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        this.logger.warn(`No response from Gemini for annual report verification`);
         return null;
       }
+      
+      const parsedResponse = this.geminiApiService.safelyParseJson(
+        result.candidates[0].content.parts[0].text
+      );
+      
+      return this.validateAnnualReportResponse(parsedResponse, candidateUrls);
+      
+    } catch (error) {
+      this.logger.error(`Error verifying annual report with Gemini: ${error.message}`);
+      return null;
     }
+  }
 
-    return parsedResponse.annualReportUrl;
+  /**
+   * Build a comprehensive prompt for Gemini to verify annual reports
+   */
+  private buildAnnualReportVerificationPrompt(
+    companyName: string, 
+    year: string, 
+    candidateUrls: any[]
+  ): string {
+    const urlsList = candidateUrls
+      .map((candidate, index) => 
+        `${index + 1}. URL: ${candidate.url}\n   Title: ${candidate.title}\n   Snippet: ${candidate.snippet}\n   Score: ${candidate.score}`
+      )
+      .join('\n\n');
+    
+    return `I need to find the official annual report for "${companyName}" from ${year} that contains revenue/financial data.
+
+Please analyze these candidate URLs and determine which one is most likely to be:
+1. An official annual report, 10-K filing, or financial statement from ${year}
+2. Contains revenue, earnings, or comprehensive financial data
+3. From the company's official website, SEC filings, or trusted investor relations sources
+4. A primary source document (not a news article, summary, or third-party analysis)
+
+Candidate URLs:
+${urlsList}
+
+Evaluation criteria (in order of importance):
+- Document type: Official annual reports, 10-K filings, and investor presentations are preferred
+- Revenue data presence: Must contain or reference financial/revenue information
+- Source credibility: Company websites, SEC.gov, and official investor relations pages are preferred
+- Year match: Document must be from ${year} reporting period
+- Document format: PDF documents are strongly preferred for annual reports
+
+Return your response in JSON format:
+{
+  "bestReportUrl": "URL of the most appropriate report or null if none found",
+  "confidence": "score from 0-10 indicating confidence in selection",
+  "reasoning": "brief explanation of selection criteria",
+  "containsRevenue": "true/false indicating if the report likely contains revenue data",
+  "documentType": "type of document (annual report, 10-K, etc.)",
+  "year": "${year}"
+}
+
+If no URL meets the criteria for a valid annual report with revenue data, return { "bestReportUrl": null, "confidence": 0, "reasoning": "No valid annual report found", "containsRevenue": false, "documentType": null, "year": "${year}" }.`;
+  }
+
+  /**
+   * Validate the Gemini response for annual report verification
+   */
+  private validateAnnualReportResponse(parsedResponse: any, candidateUrls: any[]): string | null {
+    if (!parsedResponse) {
+      return null;
+    }
+    
+    const { bestReportUrl, confidence, containsRevenue } = parsedResponse;
+    
+    // Must have high confidence and indicate revenue data presence
+    if (!bestReportUrl || confidence < 6 || containsRevenue !== true) {
+      this.logger.warn(`Annual report validation failed: confidence=${confidence}, containsRevenue=${containsRevenue}`);
+      return null;
+    }
+    
+    // Verify the URL exists in our candidate list
+    const isValidUrl = candidateUrls.some(candidate => candidate.url === bestReportUrl);
+    if (!isValidUrl) {
+      this.logger.warn(`Selected URL not in candidate list: ${bestReportUrl}`);
+      return null;
+    }
+    
+    return bestReportUrl;
   }
 
   /**
@@ -648,12 +889,12 @@ export class CompanyService {
       const targetYear = this.extractTargetYear(reportingPeriod);
       
       // First try getting revenue data from Financial Modeling Prep API
-      // const fmpRevenueData = await this.getCompanyRevenueFromFMP(companyName, targetYear);
+      const fmpRevenueData = await this.getCompanyRevenueFromFMP(companyName, targetYear);
       
-      // if (this.isValidFmpData(fmpRevenueData, targetYear)) {
-      //   this.logger.log(`Retrieved revenue data for ${companyName} from FMP API`);
-      //   return fmpRevenueData;
-      // }
+      if (this.isValidFmpData(fmpRevenueData, targetYear)) {
+        this.logger.log(`Retrieved revenue data for ${companyName} from FMP API`);
+        return fmpRevenueData;
+      }
       
       if (reportUrl) {
         this.logger.log(`Extracting financial data from provided report URL for ${companyName}`);
@@ -3330,5 +3571,76 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
     
     return false;
+  }
+
+  /**
+   * Validate if a revenue source URL refers to the correct company
+   */
+  async validateRevenueSourceUrl(companyName: string, revenueUrl: string): Promise<boolean> {
+    try {
+      this.logger.log(`Validating revenue source URL for ${companyName}: ${revenueUrl}`);
+            
+      const prompt = `
+        I need to validate if this revenue source URL refers to the correct company.
+        
+        Company Name: ${companyName}
+        Revenue Source URL: ${revenueUrl}
+        
+        Please analyze the content at this URL and determine if it contains financial information 
+        (revenue, financial statements, annual reports) for the company "${companyName}".
+        
+        Consider:
+        1. Does the document mention the company name "${companyName}" or closely related variations?
+        2. Does the URL domain or file path suggest it belongs to the company?
+        3. Does the content contain financial data that would be relevant for revenue extraction?
+        4. Is this likely to be the company's own official financial document?
+        
+        Return your response in JSON format:
+        {
+          "isValid": true/false,
+          "confidence": 0-10,
+          "companyMentioned": "company name found in the document",
+          "reasoning": "brief explanation of why this URL is valid or invalid"
+        }
+        
+        If the URL does not refer to ${companyName} or contains financial data for a different company,
+        return isValid: false.
+      `;
+      
+      const result = await this.geminiApiService.handleGeminiCall(
+        () => this.geminiAiService.processUrl(revenueUrl, prompt, 'revenueSourceValidator'),
+        2,
+        1000,
+        10 * 60 * 1000
+      );
+      
+      if (!result) {
+        this.logger.warn(`Failed to validate revenue source URL for ${companyName}, assuming invalid`);
+        return false;
+      }
+      
+      const parsedResponse = this.geminiApiService.safelyParseJson(result);
+      
+      if (!parsedResponse) {
+        this.logger.warn(`Failed to parse validation response for ${companyName}, assuming invalid`);
+        return false;
+      }
+      
+      const isValid = parsedResponse.isValid === true;
+      const confidence = parsedResponse.confidence || 0;
+      
+      this.logger.log(`Validation result for ${companyName}: ${isValid ? 'VALID' : 'INVALID'} (confidence: ${confidence}/10)`);
+      if (parsedResponse.reasoning) {
+        this.logger.log(`Reasoning: ${parsedResponse.reasoning}`);
+      }
+      
+      // Only consider valid if confidence is reasonable (> 5) and explicitly marked as valid
+      return isValid && confidence > 5;
+      
+    } catch (error) {
+      this.logger.error(`Error validating revenue source URL for ${companyName}: ${error.message}`);
+      // On error, assume the URL is invalid to be safe
+      return false;
+    }
   }
 }
