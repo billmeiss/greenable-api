@@ -242,7 +242,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 3302, toRow: 5500 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 3450, toRow: 5500 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
@@ -261,7 +261,7 @@ export class AppService {
     let failedUpdates = 0;
     
     // Process companies in batches to avoid overwhelming the system
-    const batchSize = 10;
+    const batchSize = 7;
     for (let i = 0; i < companies.length; i += batchSize) {
       const batch = companies.slice(i, i + batchSize);
       
