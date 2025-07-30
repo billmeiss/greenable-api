@@ -692,6 +692,10 @@ Extra-territorial organizations and bodies
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            potentialMatches: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
+              companyNumber: { type: Type.NUMBER },
+              reasoning: { type: Type.STRING },
+            } } },
             isSameCompany: { type: Type.BOOLEAN },
             confidence: { type: Type.NUMBER },
             reasoning: { type: Type.STRING },
