@@ -46,7 +46,9 @@ export class GeminiAiService {
         console.log(`[INFO] Reading local file: ${filePath}`);
         
         const fileBuffer = await fsPromises.readFile(filePath);
-        pdfBuffer = fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength);
+        pdfBuffer = new ArrayBuffer(fileBuffer.length);
+        const view = new Uint8Array(pdfBuffer);
+        view.set(fileBuffer);
         console.log(`[INFO] Read local file size: ${pdfBuffer.byteLength} bytes`);
       } else {
         // Handle remote URLs
