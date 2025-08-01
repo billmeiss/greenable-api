@@ -242,7 +242,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 4265, toRow: 5500 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500, toRow: 10700 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
@@ -267,17 +267,24 @@ export class AppService {
       
       const batchPromises = batch.map(async (company) => {
         try {
-          const { name, reportUrl, reportingPeriod } = company;
-          let result = await this.companyService.checkReportUrlForMissingEmployees(name, reportUrl, reportingPeriod);
+          const { name, reportUrl, reportingPeriod, revenueUrl, employeeCount } = company;
+          if (Number(employeeCount) > 0) {
+            return;
+          }
+
+          // if there's an error catch it and continue the flow
+          let result;
+          try {
+            result = await this.companyService.checkReportUrlForMissingEmployees(name, reportUrl, reportingPeriod);
+          } catch (error) {
+            console.log(`[ERROR] Failed to check report url for missing employees for ${name}: ${error.message}`);
+            return;
+          }
+          
           console.log(result);
           
           if (!result?.employeeCount) {
-            // Search for the annual report if employee count not found
-            const annualReportUrl = await this.companyService.searchForCompanyAnnualReport(name, reportingPeriod);
-            if (annualReportUrl) {
-              const annualReportData = await this.companyService.checkReportUrlForMissingEmployees(name, annualReportUrl, reportingPeriod);
-              result = annualReportData;
-            }
+              result = await this.companyService.checkReportUrlForMissingEmployees(name, revenueUrl, reportingPeriod);
           }
           
           await this.companyService.updateMissingEmployees(name, result.employeeCount, company);
