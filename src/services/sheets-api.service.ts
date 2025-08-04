@@ -153,4 +153,43 @@ export class SheetsApiService {
       { operationName: `Sheets API Clear Values: ${range}` }
     );
   }
+
+  /**
+   * Create a new sheet within an existing spreadsheet
+   */
+  async createSheet(
+    spreadsheetId: string,
+    sheetName: string,
+    options: { rowCount?: number; columnCount?: number } = {}
+  ): Promise<any> {
+    await this.initializeSheetsClient();
+
+    const { rowCount = 1000, columnCount = 26 } = options;
+
+    return this.retryUtilsService.withExponentialBackoff(
+      async () => {
+        const response = await this.sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [
+              {
+                addSheet: {
+                  properties: {
+                    title: sheetName,
+                    gridProperties: {
+                      rowCount,
+                      columnCount,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+        return response.data;
+      },
+      this.retryUtilsService.isGoogleApiRetryableError.bind(this.retryUtilsService),
+      { operationName: `Sheets API Create Sheet: ${sheetName}` }
+    );
+  }
 } 

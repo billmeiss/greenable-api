@@ -2664,7 +2664,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
    * specific to each category. Results are in kg CO2e per USD or kg CO2e per employee 
    * (emissions converted from tons to kg)
    */
-  async calculateAverageEmissionsByIndustry(): Promise<any> {
+  async calculateAverageEmissionsByIndustry(outputToSheet: boolean = false): Promise<any> {
     try {
       this.logger.log('Fetching all companies from spreadsheet');
       const allCompanies = await this.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10710 });
@@ -2675,12 +2675,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const companiesWithBasicData = this.filterCompaniesWithBasicData(allCompanies);
       this.logger.log(`Found ${companiesWithBasicData.length} companies with basic data`);
       
-      // Group companies by industry category and revenue range using CATEGORY_SCHEMA
-      const companiesByIndustryAndRevenue = this.groupCompaniesByIndustryFromSchema(companiesWithBasicData);
+      // Calculate averages using appropriate grouping (revenue or employee ranges) for each category
+      const { results: industryAverages, summary: companiesUsedSummary } = this.calculateIndustryAveragesByCategoryWithAdaptiveGrouping(companiesWithBasicData);
       
-      // Calculate averages for each industry, revenue range, and category individually with outlier removal
-      // This now also tracks summary data during processing to avoid duplicate calculations
-      const { results: industryAverages, summary: companiesUsedSummary } = this.calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue);
+      // Output to sheet if requested
+      if (outputToSheet) {
+        await this.createIndustryAveragesSheet(industryAverages);
+        this.logger.log('Industry averages successfully output to new sheet');
+      }
       
       return {
         success: true,
@@ -2716,6 +2718,216 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       this.logger.error(`Error calculating average emissions by industry: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Create a new Google Sheet with formatted industry averages data
+   * Organizes data by industry, revenue range, and GHG category for easy reading
+   */
+  private async createIndustryAveragesSheet(industryAverages: Record<string, any>): Promise<void> {
+    try {
+      this.logger.log('Creating industry averages sheet');
+      
+      // Debug: Log the structure of industryAverages
+      this.logger.log(`Industry averages keys: ${Object.keys(industryAverages)}`);
+      this.logger.log(`First industry sample: ${JSON.stringify(Object.entries(industryAverages)[0], null, 2)}`);
+      
+      // Get sheet metadata
+      const ghgCategories = this.getGhgCategoryMappings();
+      const revenueRanges = this.getRevenueRanges().map(range => range.name);
+      
+      this.logger.log(`GHG categories count: ${Object.keys(ghgCategories).length}`);
+      this.logger.log(`Revenue ranges: ${revenueRanges.join(', ')}`);
+      
+      // Create headers
+      const headers = this.buildIndustryAveragesHeaders(Object.keys(ghgCategories), revenueRanges);
+      this.logger.log(`Headers created: ${headers.length} columns`);
+
+      console.log({industryAverages})
+      
+      // Transform data into sheet format
+      const sheetData = this.transformIndustryDataForSheet(industryAverages, Object.keys(ghgCategories), revenueRanges);
+      this.logger.log(`Sheet data rows created: ${sheetData.length}`);
+      
+      // Debug: Log first few rows of data
+      if (sheetData.length > 0) {
+        this.logger.log(`First data row sample: ${JSON.stringify(sheetData[0])}`);
+        if (sheetData.length > 1) {
+          this.logger.log(`Second data row sample: ${JSON.stringify(sheetData[1])}`);
+        }
+      } else {
+        this.logger.warn('No data rows were created - this might be the issue!');
+      }
+      
+      // Combine headers with data
+      const allSheetData = [headers, ...sheetData];
+      this.logger.log(`Total sheet data rows (including headers): ${allSheetData.length}`);
+      
+      // Create a new sheet with timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      const sheetName = `Industry_Averages_${timestamp}`;
+      
+      // Create the new sheet first
+      this.logger.log(`Creating new sheet: ${sheetName}`);
+      await this.sheetsApiService.createSheet(
+        this.SPREADSHEET_ID,
+        sheetName,
+        { rowCount: Math.max(allSheetData.length + 10, 100), columnCount: Math.max(headers.length + 5, 30) }
+      );
+      
+      // Write data to the new sheet row by row
+      this.logger.log(`Writing ${allSheetData.length} rows to sheet: ${sheetName}`);
+
+      console.log({allSheetData})
+      
+      let writeResults = [];
+      for (let i = 0; i < allSheetData.length; i++) {
+        const rowNumber = i + 1;
+        const rowRange = `${sheetName}!A${rowNumber}:${this.getColumnLetter(allSheetData[i].length)}${rowNumber}`;
+        
+        this.logger.log(`Writing row ${rowNumber} to range: ${rowRange}`);
+
+        console.log(allSheetData[i])
+        
+        try {
+          const result = await this.sheetsApiService.updateValues(
+            this.SPREADSHEET_ID,
+            rowRange,
+            [allSheetData[i]]
+          );
+          writeResults.push({ row: rowNumber, success: true });
+          
+          // Add a small delay between writes to avoid rate limiting
+          if (i < allSheetData.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (error) {
+          this.logger.error(`Error writing row ${rowNumber}: ${error.message}`);
+          writeResults.push({ row: rowNumber, success: false, error: error.message });
+        }
+      }
+      
+      const successfulWrites = writeResults.filter(r => r.success).length;
+      const failedWrites = writeResults.filter(r => !r.success).length;
+      this.logger.log(`Write summary: ${successfulWrites} successful, ${failedWrites} failed`);
+      
+             if (failedWrites > 0) {
+         this.logger.warn(`Failed to write ${failedWrites} rows`);
+       }
+        
+        this.logger.log(`Successfully created and populated sheet: ${sheetName}`);
+      
+    } catch (error) {
+      this.logger.error(`Error creating industry averages sheet: ${error.message}`);
+      this.logger.error(`Error stack: ${error.stack}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Build headers for the industry averages sheet
+   * Creates columns for Industry, Range Type, Range, and each GHG category
+   */
+  private buildIndustryAveragesHeaders(ghgCategories: string[], revenueRanges: string[]): string[] {
+    const baseHeaders = ['Industry', 'Range Type', 'Range'];
+    
+    // Create headers for each GHG category with units
+    const ghgCategoryDefinitions = this.getGhgCategoryDefinitions();
+    const categoryHeaders = ghgCategories.map(category => {
+      const displayName = ghgCategoryDefinitions[category] || category;
+      
+      // Determine benchmark type based on category
+      let unit = '(kg CO2e/USD)';
+      
+      // Categories that always use employee benchmarking
+      const alwaysEmployeeBased = [
+        'scope3_cat5_waste_generated',
+        'scope3_cat6_business_travel', 
+        'scope3_cat7_employee_commuting'
+      ];
+      
+      if (alwaysEmployeeBased.includes(category)) {
+        unit = '(kg CO2e/employee)';
+      } else if (category === 'scope3_cat1_purchased_goods_services') {
+        unit = '(kg CO2e/USD or employee*)';  // Varies by industry type
+      }
+      
+      return `${displayName} ${unit}`;
+    });
+    
+    return [...baseHeaders, ...categoryHeaders];
+  }
+
+  /**
+   * Transform nested industry averages data into flat rows for sheet output
+   * Each row represents one industry-range combination with all category values
+   * Now handles both revenue and employee ranges with appropriate labeling
+   */
+  private transformIndustryDataForSheet(
+    industryAverages: Record<string, any>, 
+    ghgCategories: string[], 
+    revenueRanges: string[]
+  ): string[][] {
+    const rows: string[][] = [];
+    const employeeRanges = this.getEmployeeRanges().map(range => range.name);
+    const allPossibleRanges = [...revenueRanges, ...employeeRanges];
+    
+    // Sort industries alphabetically for better presentation
+    const sortedIndustries = Object.keys(industryAverages).sort();
+    
+    sortedIndustries.forEach(industry => {
+      const industryData = industryAverages[industry];
+      
+      // Get all ranges that have data for this industry
+      const availableRanges = allPossibleRanges.filter(range => industryData[range]);
+      
+      availableRanges.forEach(range => {
+        const rangeData = industryData[range];
+        
+        // Determine if this is a revenue range or employee range
+        const isRevenueRange = revenueRanges.includes(range);
+        const rangeType = isRevenueRange ? 'Revenue' : 'Employee Count';
+        
+        const row = [industry, rangeType, range];
+        
+        // Add value for each GHG category, or empty string if no data
+        ghgCategories.forEach(category => {
+          const categoryData = rangeData[category]; // Direct access, not nested under .categories
+          if (categoryData) {
+            // The average value is stored under either averageEmissionsPerEmployee or averageEmissionsPerDollar
+            const averageValue = categoryData.averageEmissionsPerEmployee || categoryData.averageEmissionsPerDollar;
+            if (averageValue && typeof averageValue === 'number') {
+              // Format to reasonable number of decimal places
+              row.push(averageValue.toFixed(6));
+            } else {
+              row.push(''); // No valid average value
+            }
+          } else {
+            row.push(''); // No data available
+          }
+        });
+        
+        rows.push(row);
+      });
+    });
+    
+    return rows;
+  }
+
+  /**
+   * Convert column number to Excel-style column letter (A, B, C, ..., Z, AA, AB, etc.)
+   */
+  private getColumnLetter(columnNumber: number): string {
+    let columnLetter = '';
+    let temp = columnNumber;
+    
+    while (temp > 0) {
+      temp--; // Make it 0-based
+      columnLetter = String.fromCharCode(65 + (temp % 26)) + columnLetter;
+      temp = Math.floor(temp / 26);
+    }
+    
+    return columnLetter;
   }
 
   /**
@@ -2770,7 +2982,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       { name: '0-50M', min: 0, max: 50000000 },
       { name: '50M-250M', min: 50000000, max: 250000000 },
       { name: '250M-1B', min: 250000000, max: 1000000000 },
-      { name: '1B+', min: 1000000000, max: 10000000000 }
+      { name: '1B+', min: 1000000000, max: 1000000000000000 }
     ];
   }
 
@@ -2781,6 +2993,135 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const ranges = this.getRevenueRanges();
     const range = ranges.find(r => revenue >= r.min && revenue < r.max);
     return range ? range.name : 'Unknown';
+  }
+
+  /**
+   * Define employee count ranges for employee-based benchmarking
+   */
+  private getEmployeeRanges(): Array<{name: string, min: number, max: number}> {
+    return [
+      { name: '1-100', min: 1, max: 100 },
+      { name: '101-500', min: 101, max: 500 },
+      { name: '501-2000', min: 501, max: 2000 },
+      { name: '2001+', min: 2001, max: 1000000000 }
+    ];
+  }
+
+  /**
+   * Determine which employee range a company belongs to
+   */
+  private getEmployeeRangeForCompany(employeeCount: number): string {
+    const ranges = this.getEmployeeRanges();
+    const range = ranges.find(r => employeeCount >= r.min && employeeCount < r.max);
+    return range ? range.name : 'Unknown';
+  }
+
+  /**
+   * Group companies by industry only
+   */
+  private groupCompaniesByIndustry(companies: any[]): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+    
+    companies.forEach(company => {
+      const industry = company.category;
+      
+      if (this.isValidIndustryCategory(industry)) {
+        if (!grouped[industry]) {
+          grouped[industry] = [];
+        }
+        grouped[industry].push(company);
+      }
+    });
+    
+    return grouped;
+  }
+
+  /**
+   * Group companies by revenue ranges
+   */
+  private groupCompaniesByRevenueRange(companies: any[]): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+    
+    companies.forEach(company => {
+      const revenue = this.parseNumericValue(company.revenue);
+      if (revenue > 0) {
+        const revenueRange = this.getRevenueRangeForCompany(revenue);
+        if (!grouped[revenueRange]) {
+          grouped[revenueRange] = [];
+        }
+        grouped[revenueRange].push(company);
+      }
+    });
+    
+    return grouped;
+  }
+
+  /**
+   * Group companies by employee count ranges
+   */
+  private groupCompaniesByEmployeeRange(companies: any[]): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+    
+    companies.forEach(company => {
+      const employeeCount = this.parseNumericValue(company.employeeCount);
+      if (employeeCount > 0) {
+        const employeeRange = this.getEmployeeRangeForCompany(employeeCount);
+        if (!grouped[employeeRange]) {
+          grouped[employeeRange] = [];
+        }
+        grouped[employeeRange].push(company);
+      }
+    });
+    
+    return grouped;
+  }
+
+  /**
+   * Calculate average for a specific category within a range of companies
+   */
+  private calculateCategoryAverageForRange(
+    companies: any[], 
+    categoryName: string, 
+    fieldName: string, 
+    industryCategory: string
+  ): any {
+    const useEmployeeBenchmark = this.shouldUseEmployeeBenchmark(categoryName, industryCategory);
+    
+    // Calculate emissions ratios using appropriate benchmark
+    const emissionsRatios = useEmployeeBenchmark 
+      ? this.calculateEmissionsPerEmployeeForCategory(companies, fieldName)
+      : this.calculateEmissionsPerDollarForCategory(companies, fieldName);
+    
+    const benchmarkUnit = useEmployeeBenchmark ? 'kg CO2e/employee' : 'kg CO2e/USD';
+    const benchmarkType = useEmployeeBenchmark ? 'employee' : 'revenue';
+    
+    if (emissionsRatios.length === 0) {
+      return null;
+    }
+    
+    // Remove outliers specific to this category
+    const cleanedData = this.removeOutliers(emissionsRatios);
+    const outliersRemoved = emissionsRatios.length - cleanedData.length;
+    
+    if (cleanedData.length < 4) {
+      return null;
+    }
+    
+    const averageKey = useEmployeeBenchmark ? 'averageEmissionsPerEmployee' : 'averageEmissionsPerDollar';
+    
+    return {
+      [averageKey]: this.calculateMean(cleanedData),
+      unit: benchmarkUnit,
+      benchmarkType: benchmarkType,
+      companiesIncluded: cleanedData.length,
+      totalCompaniesWithData: emissionsRatios.length,
+      outliersRemoved: outliersRemoved,
+      outlierPercentage: parseFloat(((outliersRemoved/emissionsRatios.length)*100).toFixed(2)),
+      standardDeviation: this.calculateStandardDeviation(cleanedData),
+      median: this.calculateMedian(cleanedData),
+      min: Math.min(...cleanedData),
+      max: Math.max(...cleanedData)
+    };
   }
 
   /**
@@ -2871,27 +3212,63 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   }
 
   /**
-   * Calculate industry averages for each category individually with category-specific outlier removal
-   * Now segments by revenue ranges to avoid skewing and tracks summary data during processing
+   * Calculate industry averages using adaptive grouping - revenue ranges for revenue-based categories,
+   * employee ranges for employee-based categories
    */
-  private calculateIndustryAveragesByCategory(companiesByIndustryAndRevenue: Record<string, Record<string, any[]>>): { results: Record<string, any>; summary: Record<string, any> } {
+  private calculateIndustryAveragesByCategoryWithAdaptiveGrouping(companies: any[]): { results: Record<string, any>; summary: Record<string, any> } {
     const results: Record<string, any> = {};
     const companiesUsedSummary: Record<string, any> = {};
+    const ghgCategories = this.getGhgCategoryMappings();
     
-    Object.entries(companiesByIndustryAndRevenue).forEach(([industry, revenueRanges]) => {
+    // Group companies by industry first
+    const companiesByIndustry = this.groupCompaniesByIndustry(companies);
+    
+    Object.entries(companiesByIndustry).forEach(([industry, industryCompanies]) => {
+      if (industryCompanies.length < 4) {
+        this.logger.warn(`Skipping industry '${industry}' - insufficient data (${industryCompanies.length} companies)`);
+        return;
+      }
+      
       results[industry] = {};
       companiesUsedSummary[industry] = {};
       
-      Object.entries(revenueRanges).forEach(([revenueRange, companies]) => {
-        if (companies.length < 3) {
-          // Skip revenue ranges with less than 3 companies
-          this.logger.warn(`Skipping industry '${industry}' revenue range '${revenueRange}' - insufficient data (${companies.length} companies)`);
-          return;
-        }
+      // For each category, determine the appropriate grouping method and calculate averages
+      Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
+        const useEmployeeBenchmark = this.shouldUseEmployeeBenchmark(categoryName, industry);
         
-        const { averages, summary } = this.calculateIndustryAveragesWithCategorySpecificOutliers(companies, industry);
-        results[industry][revenueRange] = averages;
-        companiesUsedSummary[industry][revenueRange] = summary;
+        // Group companies by appropriate range type for this category
+        const companiesGroupedByRange = useEmployeeBenchmark 
+          ? this.groupCompaniesByEmployeeRange(industryCompanies)
+          : this.groupCompaniesByRevenueRange(industryCompanies);
+        
+        // Calculate averages for each range within this category
+        Object.entries(companiesGroupedByRange).forEach(([range, rangeCompanies]) => {
+          if (rangeCompanies.length < 4) {
+            this.logger.warn(`Skipping ${industry} - ${range} for ${categoryName} - insufficient data (${rangeCompanies.length} companies)`);
+            return;
+          }
+          
+          // Initialize range if not exists
+          if (!results[industry][range]) {
+            results[industry][range] = {};
+          }
+          if (!companiesUsedSummary[industry][range]) {
+            companiesUsedSummary[industry][range] = {};
+          }
+          
+          // Calculate average for this specific category and range
+          const categoryAverage = this.calculateCategoryAverageForRange(rangeCompanies, categoryName, fieldName, industry);
+          
+          if (categoryAverage) {
+            results[industry][range][categoryName] = categoryAverage;
+            companiesUsedSummary[industry][range][categoryName] = {
+              companiesIncluded: categoryAverage.companiesIncluded,
+              totalCompaniesWithData: categoryAverage.totalCompaniesWithData,
+              outliersRemoved: categoryAverage.outliersRemoved,
+              benchmarkType: categoryAverage.benchmarkType
+            };
+          }
+        });
       });
       
       // Remove empty industry entries
@@ -3034,7 +3411,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
    * This operates on emissions per dollar ratios, NOT raw emissions data
    */
   private removeOutliers(data: number[]): number[] {
-    if (data.length < 4) {
+    if (data.length <= 3) {
       return data; // Can't calculate quartiles with less than 4 data points
     }
     
@@ -3514,19 +3891,24 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
    * Calculate emissions per employee for a specific category/field
    */
   private calculateEmissionsPerEmployeeForCategory(companies: any[], fieldName: string): number[] {
-    return companies
-      .filter(company => {
-        // Must have valid emissions data for this category and employee count
-        const emissionsValue = this.parseNumericValue(company[fieldName]);
-        const employeeCount = this.parseNumericValue(company.employeeCount);
-        return this.isValidValue(emissionsValue) && this.isValidValue(employeeCount) && employeeCount > 0;
-      })
-      .map(company => {
-        const emissionsValue = this.parseNumericValue(company[fieldName]);
-        const employeeCount = this.parseNumericValue(company.employeeCount);
-        // Convert tons to kg and calculate per employee
-        return (emissionsValue * 1000) / employeeCount;
-      });
+    const validCompanies = companies.filter(company => {
+      // Must have valid emissions data for this category and employee count > 0
+      const emissionsValue = this.parseNumericValue(company[fieldName]);
+      const employeeCount = this.parseNumericValue(company.employeeCount);
+      
+      // Ensure both values exist, are positive numbers, and employee count is > 0
+      const hasValidEmissions = this.isValidValue(emissionsValue) && emissionsValue > 0;
+      const hasValidEmployeeCount = this.isValidValue(employeeCount) && employeeCount > 0;
+      
+      return hasValidEmissions && hasValidEmployeeCount;
+    });
+
+    return validCompanies.map(company => {
+      const emissionsValue = this.parseNumericValue(company[fieldName]);
+      const employeeCount = this.parseNumericValue(company.employeeCount);
+      // Convert tons to kg and calculate per employee
+      return (emissionsValue * 1000) / employeeCount;
+    });
   }
 
   /**

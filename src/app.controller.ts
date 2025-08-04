@@ -119,6 +119,11 @@ export class AppController {
     return this.appService.calculateAverageEmissionsByIndustry();
   }
 
+  @Post('/create-industry-averages-sheet')
+  createIndustryAveragesSheet() {
+    return this.appService.createIndustryAveragesSheet();
+  }
+
   @Post('/fix-revenue-source-errors')
   fixRevenueSourceErrors() {
     return this.appService.fixRevenueSourceErrors();

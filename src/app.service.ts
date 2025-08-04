@@ -242,7 +242,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 5500, toRow: 10700 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 9600, toRow: 10700 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
@@ -753,10 +753,10 @@ export class AppService {
    * Uses revenue benchmarking (kg CO2e/USD) for most categories and employee benchmarking (kg CO2e/employee) 
    * for specific categories (Categories 1 for office-based industries, 5, 6, and 7)
    */
-  async calculateAverageEmissionsByIndustry(): Promise<any> {
+  async calculateAverageEmissionsByIndustry(outputToSheet: boolean = false): Promise<any> {
     try {
       this.logger.log('Starting calculation of average emissions per benchmark unit by industry');
-      const result = await this.companyService.calculateAverageEmissionsByIndustry();
+      const result = await this.companyService.calculateAverageEmissionsByIndustry(outputToSheet);
       
       this.logger.log(`Average emissions calculation completed for ${Object.keys(result.industries || {}).length} industries`);
       return result;
@@ -766,6 +766,36 @@ export class AppService {
         success: false,
         error: error.message,
         industries: {}
+      };
+    }
+  }
+
+  /**
+   * Calculate average emissions by industry and output results to a new formatted Google Sheet
+   */
+  async createIndustryAveragesSheet(): Promise<any> {
+    try {
+      this.logger.log('Creating industry averages sheet with formatted data');
+      const result = await this.companyService.calculateAverageEmissionsByIndustry(true);
+      
+      if (result.success) {
+        this.logger.log('Industry averages sheet created successfully');
+        return {
+          success: true,
+          message: 'Industry averages sheet created successfully',
+          industriesAnalyzed: result.industriesAnalyzed,
+          totalCompaniesProcessed: result.totalCompaniesProcessed,
+          companiesWithBasicData: result.companiesWithBasicData
+        };
+      } else {
+        throw new Error('Failed to calculate industry averages');
+      }
+    } catch (error) {
+      this.logger.error(`Error creating industry averages sheet: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        message: 'Failed to create industry averages sheet'
       };
     }
   }
