@@ -242,7 +242,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 9640, toRow: 10700 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 10597, toRow: 10700 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
