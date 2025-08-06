@@ -349,89 +349,89 @@ export class AppService {
         try {
           const { name, reportingPeriod, revenueYear, revenue: revenueAmount, exchangeRateCountry, revenueUrl, reportUrl, category, country } = company;
 
-          if (revenueUrl!== 'Error occurred during retrieval') {
-            return;
-          }
-          
-          // if (revenueAmount && exchangeRateCountry !== 'USD') {
-          //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
-          //   if (exchangeRate) {
-          //     const updatedRevenue = revenueAmount / exchangeRate;
-          //     await this.companyService.updateNewRevenue(name, {
-          //       revenue: updatedRevenue,
-          //       currency: 'USD'
-          //     });
-          //   } else {
-          //     const revenueData = await this.companyService.convertCurrencyUsingGemini({
-          //       revenue: revenueAmount,
-          //       currency: exchangeRateCountry,
-          //       year: revenueYear,
-          //       source: 'Gemini',
-          //       confidence: 1
-          //     }, company);
-          //     await this.companyService.updateNewRevenue(name, {
-          //       revenue: revenueData.revenue,
-          //       currency: 'USD',
-          //       year: revenueYear,
-          //       source: 'Gemini',
-          //       confidence: 1
-          //     });
-          //   }
+          // if (revenueUrl!== 'Error occurred during retrieval') {
           //   return;
           // }
           
-          // Check if the revenue source is not Financial Modeling Prep or Vertex AI
-          if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
-            return;
-          }
-
-          // if (Boolean(revenueAmount) && revenueAmount !== 0 && revenueAmount !== null && revenueAmount !== undefined && revenueAmount !== '0') {
-          //   return;
-          // }
-
-          // if (revenueAmount) {
-          //         // Check if the existing revenue source returns a 404
-          // try {
-          //   const response = await axios.get(revenueUrl);
-          //   if (response.status === 200) return;
-          // } catch (error) {
-          //   console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
-          // }
-          // }
-
-          // Update the revenue source to the annual report
-          const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl, category, country);
-          console.log(revenue);
-          
-          if (!revenue || !revenue.revenue) {
-            console.log(`[ERROR] No annual report found for ${name}`);
-            await this.companyService.updateCompanyRevenue(name, {
-              revenue: 0,
-              year: revenueYear,
-              source: 'Could not find annual report',
-              sourceUrl: revenue?.sourceUrl || 'Could not find annual report',
-              confidence: 1,
-            });
-            return;
-          }
-          
-          let updatedRevenue = revenue.revenue;
-          let updatedCurrency = revenue.currency;
-          
-          if (revenue.currency !== 'USD') {
-            // Look up the exchange rate for the reporting period in rates.json
-            const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, revenue.currency);
+          if (revenueAmount && exchangeRateCountry !== 'USD') {
+            const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, exchangeRateCountry);
             if (exchangeRate) {
-              updatedRevenue = revenue.revenue / exchangeRate;
-              updatedCurrency = 'USD';
+              const updatedRevenue = revenueAmount / exchangeRate;
+              await this.companyService.updateNewRevenue(name, {
+                revenue: updatedRevenue,
+                currency: 'USD'
+              });
+            } else {
+              const revenueData = await this.companyService.convertCurrencyUsingGemini({
+                revenue: revenueAmount,
+                currency: exchangeRateCountry,
+                year: revenueYear,
+                source: 'Gemini',
+                confidence: 1
+              }, company);
+              await this.companyService.updateNewRevenue(name, {
+                revenue: revenueData.revenue,
+                currency: 'USD',
+                year: revenueYear,
+                source: 'Gemini',
+                confidence: 1
+              });
             }
+            return;
           }
           
-          await this.companyService.updateCompanyRevenue(name, {
-            ...revenue,
-            revenue: updatedRevenue,
-            currency: updatedCurrency
-          });
+          // // Check if the revenue source is not Financial Modeling Prep or Vertex AI
+          // if (revenueUrl?.includes('financialmodelingprep') || revenueUrl?.includes('vertexai')) {
+          //   return;
+          // }
+
+          // // if (Boolean(revenueAmount) && revenueAmount !== 0 && revenueAmount !== null && revenueAmount !== undefined && revenueAmount !== '0') {
+          // //   return;
+          // // }
+
+          // // if (revenueAmount) {
+          // //         // Check if the existing revenue source returns a 404
+          // // try {
+          // //   const response = await axios.get(revenueUrl);
+          // //   if (response.status === 200) return;
+          // // } catch (error) {
+          // //   console.log(`[ERROR] existing url ${revenueUrl} is not valid`);
+          // // }
+          // // }
+
+          // // Update the revenue source to the annual report
+          // const revenue = await this.companyService.getCompanyRevenue(name, revenueYear, reportUrl, category, country);
+          // console.log(revenue);
+          
+          // if (!revenue || !revenue.revenue) {
+          //   console.log(`[ERROR] No annual report found for ${name}`);
+          //   await this.companyService.updateCompanyRevenue(name, {
+          //     revenue: 0,
+          //     year: revenueYear,
+          //     source: 'Could not find annual report',
+          //     sourceUrl: revenue?.sourceUrl || 'Could not find annual report',
+          //     confidence: 1,
+          //   });
+          //   return;
+          // }
+          
+          // let updatedRevenue = revenue.revenue;
+          // let updatedCurrency = revenue.currency;
+          
+          // if (revenue.currency !== 'USD') {
+          //   // Look up the exchange rate for the reporting period in rates.json
+          //   const exchangeRate = await this.companyService.getExchangeRate(reportingPeriod, revenue.currency);
+          //   if (exchangeRate) {
+          //     updatedRevenue = revenue.revenue / exchangeRate;
+          //     updatedCurrency = 'USD';
+          //   }
+          // }
+          
+          // await this.companyService.updateCompanyRevenue(name, {
+          //   ...revenue,
+          //   revenue: updatedRevenue,
+          //   currency: updatedCurrency
+          // });
           
           successfulUpdates++;
           this.logger.log(`Successfully updated revenue for ${name}`);
