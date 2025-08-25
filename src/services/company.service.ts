@@ -10,6 +10,7 @@ import { GeminiAiService } from './gemini-ai.service';
 import { SearchService } from './search.service';
 import { EmissionsReportService } from './emissions-report.service';
 import { CATEGORY_SCHEMA } from '../constants';
+import { writeFileSync } from 'fs';
 
 // Add type definition for Gemini API response
 interface GeminiResponse {
@@ -707,12 +708,12 @@ If no URL meets the criteria for a valid annual report with revenue data, return
         // Calculate the actual row number in the sheet
         const actualRowNumber = 2 + companyIndex;
 
-        // Update the employee count in column E
-        await this.sheetsApiService.updateValues(
-          this.SPREADSHEET_ID,
-          `Analysed Data!H${actualRowNumber}`,
-          [[employeeCount]]
-        );
+        // // Update the employee count in column E
+        // await this.sheetsApiService.updateValues(
+        //   this.SPREADSHEET_ID,
+        //   `Analysed Data!H${actualRowNumber}`,
+        //   [[employeeCount]]
+        // );
 
         console.log(`[SUCCESS] Updated employee count for ${companyName} to ${employeeCount}`);
       
@@ -733,6 +734,68 @@ If no URL meets the criteria for a valid annual report with revenue data, return
     const parsedResponse = this.geminiApiService.safelyParseJson(response);
     
     return parsedResponse;
+  }
+
+  /**
+   * Prompt Gemini (text-only) to get employee count using a two-step process:
+   * 1. Google Search to find information
+   * 2. JSON extraction from search results
+   */
+  async getEmployeeCountFromPrompt(companyName: string, reportUrl: string, targetYear: string): Promise<any> {
+    try {
+      // Step 1: Use Google Search to find employee information
+      const searchModel = this.geminiModelService.getModel('employeeSearch');
+      const searchPrompt = `
+Find the total number of employees for the company "${companyName}" in ${targetYear}.
+
+Context URL (for the correct company and potential source): ${reportUrl}
+
+Search for official company sources such as:
+- Annual reports
+- Sustainability/ESG reports  
+- Investor relations pages
+- 10-K/20-F filings
+- Company websites
+
+Make sure you're finding information about the exact company "${companyName}" and not similarly named entities.
+If ${targetYear} data is unavailable, look for the closest previous year.`;
+
+      const searchResult = await this.geminiApiService.handleGeminiCall(
+        () => searchModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: searchPrompt }] }],
+        })
+      );
+
+      // Step 2: Extract structured JSON from the search results
+      const extractorModel = this.geminiModelService.getModel('employeeSearchJsonExtractor');
+      const extractorPrompt = `
+Based on the following search results, extract the employee count information for "${companyName}":
+
+${searchResult.text}
+
+Target year: ${targetYear}
+Company name: ${companyName}`;
+
+      const extractorResult = await this.geminiApiService.handleGeminiCall(
+        () => extractorModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: extractorPrompt }] }],
+        })
+      );
+
+      const parsed = this.geminiApiService.safelyParseJson(extractorResult.text);
+      
+      // Return in the expected format for backward compatibility
+      return {
+        employeeCount: parsed.employeeCount,
+        source: parsed.source,
+        year: parsed.year,
+        confidence: parsed.confidence,
+        notes: parsed.notes
+      };
+    } catch (error) {
+      this.logger.error(`Error prompting Gemini for employee count for ${companyName}: ${error.message}`);
+      return { employeeCount: null };
+    }
   }
 
   /**
@@ -757,12 +820,14 @@ If no URL meets the criteria for a valid annual report with revenue data, return
         "currency": "USD",
         "year": "2023",
         "employeeCount": 50000,
-        "confidence": 9
+        "confidence": 0-10
       }
       
-      If employee count is not found, set employeeCount to null.
-      If revenue is not found, set revenue to null.
-      Confidence should be 1-10 based on data clarity and source reliability.
+      Rules:
+      - Validate that the company referenced in the document matches ${companyName}
+      - If employee count is presented as a range, choose the most precise single value or return null if ambiguous
+      - If multiple years are available, prefer ${targetYear}, else choose the closest recent year
+      - Convert revenue to USD if another currency is used, and specify the currency in the output
     `;
   }
 
@@ -1107,7 +1172,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Extended range to include third party assurance data (columns AF and AG)
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow || 2}:AN${toRow || 5500}`
+        `'Mycelium_Check'!A${fromRow || 2}:AN${toRow || 5500}`
       );
       
       const rows = data.values || [];
@@ -1574,6 +1639,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       let result;
       
       if (reportUrl) {
+        try {
         // Use the AI service to process the report URL for additional context
         result = await this.geminiApiService.handleGeminiCall(
           () => this.geminiAiService.processUrl(reportUrl, prompt, 'countryFinder'),
@@ -1588,10 +1654,11 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         if (parsedResponse && parsedResponse.country) {
           return parsedResponse as CountryData;
         }
-        
-        // If report URL processing fails, fall back to the standard method
-        this.logger.warn(`Failed to determine country from report URL for ${companyName}, falling back to standard method`);
+        } catch (error) { 
+          this.logger.warn(`Failed to determine country from report URL for ${companyName}, falling back to standard method`);
+        }
       }
+
       
       // Standard method without report URL
       result = await this.geminiApiService.handleGeminiCall(
@@ -2259,7 +2326,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
     const data = await this.sheetsApiService.getValues(
       this.SPREADSHEET_ID,
-      `Analysed Data!A2:E`
+      `Mycelium_Check!A2:E`
     );
     const rows = data.values || [];
     const companyIndex = rows.findIndex(row => row[0] === company);
@@ -2267,7 +2334,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     if (incorrectEmissions && incorrectEmissions.length > 0) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!AY${companyIndex + 2}:AZ${companyIndex + 2}`,
+        `Mycelium_Check!AY${companyIndex + 2}:AZ${companyIndex + 2}`,
         [[incorrectEmissions.map(emission => `${emission.companyName} - ${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason} --- ${emission.confidence})`).join('\n'), 'Not checked or updated']]
       );
     }
@@ -2302,14 +2369,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   async updateCompanyNotes(company: string, notes: string): Promise<any> {
     const data = await this.sheetsApiService.getValues(
       this.SPREADSHEET_ID,
-      `Analysed Data!A2:E`
+      `Mycelium_Check!A2:E`
     );
     const rows = data.values || [];
     const companyIndex = rows.findIndex(row => row[0] === company);
 
     await this.sheetsApiService.updateValues(
       this.SPREADSHEET_ID,
-      `Analysed Data!AU${companyIndex + 2}`, 
+      `Mycelium_Check!AU${companyIndex + 2}`, 
       [[`${notes}`]]
     );
   }
@@ -2826,42 +2893,36 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
   /**
    * Build headers for the industry averages sheet
-   * Creates columns for Industry, Range Type, Range, and each GHG category
+   * Creates the exact format required: Category, Revenue_Band, Employee_Band, then specific scope averages
    */
   private buildIndustryAveragesHeaders(ghgCategories: string[], revenueRanges: string[]): string[] {
-    const baseHeaders = ['Industry', 'Range Type', 'Range'];
-    
-    // Create headers for each GHG category with units
-    const ghgCategoryDefinitions = this.getGhgCategoryDefinitions();
-    const categoryHeaders = ghgCategories.map(category => {
-      const displayName = ghgCategoryDefinitions[category] || category;
-      
-      // Determine benchmark type based on category
-      let unit = '(kg CO2e/USD)';
-      
-      // Categories that always use employee benchmarking
-      const alwaysEmployeeBased = [
-        'scope3_cat5_waste_generated',
-        'scope3_cat6_business_travel', 
-        'scope3_cat7_employee_commuting'
-      ];
-      
-      if (alwaysEmployeeBased.includes(category)) {
-        unit = '(kg CO2e/employee)';
-      } else if (category === 'scope3_cat1_purchased_goods_services') {
-        unit = '(kg CO2e/USD or employee*)';  // Varies by industry type
-      }
-      
-      return `${displayName} ${unit}`;
-    });
-    
-    return [...baseHeaders, ...categoryHeaders];
+    return [
+      'Category', 
+      'Revenue_Band', 
+      'Employee_Band',
+      'Avg_Scope1_Per_Dollar',
+      'Avg_Scope2_Per_Dollar', 
+      'Avg_Scope3_Cat1_Per_Dollar',
+      'Avg_Scope3_Cat2_Per_Dollar',
+      'Avg_Scope3_Cat3_Per_Dollar', 
+      'Avg_Scope3_Cat4_Per_Dollar',
+      'Avg_Scope3_Cat5_Per_Dollar',
+      'Avg_Scope3_Cat6_Per_Dollar',
+      'Avg_Scope3_Cat7_Per_Dollar',
+      'Avg_Scope3_Cat8_Per_Dollar',
+      'Avg_Scope3_Cat9_Per_Dollar',
+      'Avg_Scope3_Cat10_Per_Dollar',
+      'Avg_Scope3_Cat11_Per_Dollar',
+      'Avg_Scope3_Cat12_Per_Dollar',
+      'Avg_Scope3_Cat13_Per_Dollar',
+      'Avg_Scope3_Cat14_Per_Dollar',
+      'Avg_Scope3_Cat15_Per_Dollar'
+    ];
   }
 
   /**
-   * Transform nested industry averages data into flat rows for sheet output
-   * Each row represents one industry-range combination with all category values
-   * Now handles both revenue and employee ranges with appropriate labeling
+   * Transform industry averages data into the required sheet format
+   * Creates cross-product of Category x Revenue_Band x Employee_Band with specific scope columns
    */
   private transformIndustryDataForSheet(
     industryAverages: Record<string, any>, 
@@ -2870,44 +2931,113 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   ): string[][] {
     const rows: string[][] = [];
     const employeeRanges = this.getEmployeeRanges().map(range => range.name);
-    const allPossibleRanges = [...revenueRanges, ...employeeRanges];
+    
+    // Add ALL_BANDS to the ranges for fallback data
+    const allRevenueRanges = [...revenueRanges, 'ALL_BANDS'];
+    const allEmployeeRanges = [...employeeRanges, 'ALL_BANDS'];
     
     // Sort industries alphabetically for better presentation
     const sortedIndustries = Object.keys(industryAverages).sort();
     
+    // Create mapping of internal category names to required column order
+    const categoryColumnMap = {
+      'scope1': 0,                                    // Avg_Scope1_Per_Dollar
+      'scope2': 1,                                    // Avg_Scope2_Per_Dollar  
+      'scope3_cat1_purchased_goods_services': 2,      // Avg_Scope3_Cat1_Per_Dollar
+      'scope3_cat2_capital_goods': 3,                 // Avg_Scope3_Cat2_Per_Dollar
+      'scope3_cat3_fuel_energy_activities': 4,       // Avg_Scope3_Cat3_Per_Dollar
+      'scope3_cat4_upstream_transportation': 5,       // Avg_Scope3_Cat4_Per_Dollar
+      'scope3_cat5_waste_generated': 6,               // Avg_Scope3_Cat5_Per_Dollar
+      'scope3_cat6_business_travel': 7,               // Avg_Scope3_Cat6_Per_Dollar
+      'scope3_cat7_employee_commuting': 8,            // Avg_Scope3_Cat7_Per_Dollar
+      'scope3_cat8_upstream_leased_assets': 9,        // Avg_Scope3_Cat8_Per_Dollar
+      'scope3_cat9_downstream_transportation': 10,    // Avg_Scope3_Cat9_Per_Dollar
+      'scope3_cat10_processing_sold_products': 11,    // Avg_Scope3_Cat10_Per_Dollar
+      'scope3_cat11_use_sold_products': 12,           // Avg_Scope3_Cat11_Per_Dollar
+      'scope3_cat12_end_of_life_treatment': 13,       // Avg_Scope3_Cat12_Per_Dollar
+      'scope3_cat13_downstream_leased_assets': 14,    // Avg_Scope3_Cat13_Per_Dollar
+      'scope3_cat14_franchises': 15,                  // Avg_Scope3_Cat14_Per_Dollar
+      'scope3_cat15_investments': 16                  // Avg_Scope3_Cat15_Per_Dollar
+    };
+    
     sortedIndustries.forEach(industry => {
       const industryData = industryAverages[industry];
       
-      // Get all ranges that have data for this industry
-      const availableRanges = allPossibleRanges.filter(range => industryData[range]);
-      
-      availableRanges.forEach(range => {
-        const rangeData = industryData[range];
-        
-        // Determine if this is a revenue range or employee range
-        const isRevenueRange = revenueRanges.includes(range);
-        const rangeType = isRevenueRange ? 'Revenue' : 'Employee Count';
-        
-        const row = [industry, rangeType, range];
-        
-        // Add value for each GHG category, or empty string if no data
-        ghgCategories.forEach(category => {
-          const categoryData = rangeData[category]; // Direct access, not nested under .categories
-          if (categoryData) {
-            // The average value is stored under either averageEmissionsPerEmployee or averageEmissionsPerDollar
-            const averageValue = categoryData.averageEmissionsPerEmployee || categoryData.averageEmissionsPerDollar;
-            if (averageValue && typeof averageValue === 'number') {
-              // Format to reasonable number of decimal places
-              row.push(averageValue.toFixed(6));
-            } else {
-              row.push(''); // No valid average value
+      // Create cross-product of revenue and employee ranges (including ALL_BANDS)
+      allRevenueRanges.forEach(revenueRange => {
+        allEmployeeRanges.forEach(employeeRange => {
+          // Handle ALL_BANDS special case - only process ALL_BANDS x ALL_BANDS combination
+          if ((revenueRange === 'ALL_BANDS' || employeeRange === 'ALL_BANDS') && 
+              !(revenueRange === 'ALL_BANDS' && employeeRange === 'ALL_BANDS')) {
+            return;
+          }
+          
+          // Check if we have data for this revenue range or employee range combination
+          const revenueData = industryData[revenueRange];
+          const employeeData = industryData[employeeRange];
+          
+          // Skip if no data for either range
+          if (!revenueData && !employeeData) {
+            return;
+          }
+          
+          // Create row with basic info
+          const row = [industry, revenueRange, employeeRange];
+          
+          // Initialize values array for the 17 scope columns (Scope1 + Scope2 + Scope3 Cat1-15)
+          const scopeValues = new Array(17).fill('');
+          
+          // Process revenue-based data (most categories use revenue benchmarking)
+          if (revenueData) {
+            Object.keys(categoryColumnMap).forEach(category => {
+              const columnIndex = categoryColumnMap[category];
+              const categoryData = revenueData[category];
+              
+              if (categoryData && categoryData.average && typeof categoryData.average === 'number') {
+                // For ALL_BANDS data, the average is already calculated and stored in the 'average' field
+                scopeValues[columnIndex] = categoryData.average.toFixed(12);
+              } else if (categoryData && categoryData.averageEmissionsPerDollar && typeof categoryData.averageEmissionsPerDollar === 'number') {
+                // For regular band data, use the existing field name
+                scopeValues[columnIndex] = categoryData.averageEmissionsPerDollar.toFixed(12);
+              }
+            });
+          }
+          
+          // Process employee-based data (categories 5, 6, 7 and sometimes 1)
+          if (employeeData) {
+            const employeeBasedCategories = [
+              'scope3_cat5_waste_generated',
+              'scope3_cat6_business_travel', 
+              'scope3_cat7_employee_commuting'
+            ];
+            
+            // Also check for office-based scope3_cat1
+            if (industry !== 'Cement' && industry !== 'Agriculture') {
+              employeeBasedCategories.push('scope3_cat1_purchased_goods_services');
             }
-          } else {
-            row.push(''); // No data available
+            
+            employeeBasedCategories.forEach(category => {
+              if (categoryColumnMap[category] !== undefined) {
+                const columnIndex = categoryColumnMap[category];
+                const categoryData = employeeData[category];
+                
+                if (categoryData && categoryData.average && typeof categoryData.average === 'number') {
+                  // For ALL_BANDS data, the average is already calculated and stored in the 'average' field
+                  scopeValues[columnIndex] = categoryData.average.toFixed(12);
+                } else if (categoryData && categoryData.averageEmissionsPerEmployee && typeof categoryData.averageEmissionsPerEmployee === 'number') {
+                  // For regular band data, use the existing field name
+                  scopeValues[columnIndex] = categoryData.averageEmissionsPerEmployee.toFixed(12);
+                }
+              }
+            });
+          }
+          
+          // Only add row if we have at least one value
+          if (scopeValues.some(val => val !== '')) {
+            row.push(...scopeValues);
+            rows.push(row);
           }
         });
-        
-        rows.push(row);
       });
     });
     
@@ -3089,9 +3219,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     
     // Calculate emissions ratios using appropriate benchmark
     const emissionsRatios = useEmployeeBenchmark 
-      ? this.calculateEmissionsPerEmployeeForCategory(companies, fieldName)
-      : this.calculateEmissionsPerDollarForCategory(companies, fieldName);
-    
+      ? this.calculateEmissionsPerEmployeeForCategory(companies, fieldName, categoryName)
+      : this.calculateEmissionsPerDollarForCategory(companies, fieldName).ratiosInTonsPerDollar;
+
+    if (categoryName === 'scope3_cat1_purchased_goods_services' && industryCategory === 'Computer and related services') {
+      const valuesForLogging = this.calculateEmissionsPerDollarForCategory(companies, fieldName).valuesForLogging;
+      writeFileSync(`${industryCategory}-${categoryName}.json`, JSON.stringify(valuesForLogging, null, 2));
+    }
+
     const benchmarkUnit = useEmployeeBenchmark ? 'kg CO2e/employee' : 'kg CO2e/USD';
     const benchmarkType = useEmployeeBenchmark ? 'employee' : 'revenue';
     
@@ -3100,7 +3235,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     }
     
     // Remove outliers specific to this category
-    const cleanedData = this.removeOutliers(emissionsRatios);
+    const cleanedData = this.removeOutliers(emissionsRatios, benchmarkType as 'employee' | 'revenue');
     const outliersRemoved = emissionsRatios.length - cleanedData.length;
     
     if (cleanedData.length < 4) {
@@ -3110,85 +3245,18 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const averageKey = useEmployeeBenchmark ? 'averageEmissionsPerEmployee' : 'averageEmissionsPerDollar';
     
     return {
-      [averageKey]: this.calculateMean(cleanedData),
+      [averageKey]: this.calculateMean(cleanedData) * 1000,
       unit: benchmarkUnit,
       benchmarkType: benchmarkType,
       companiesIncluded: cleanedData.length,
       totalCompaniesWithData: emissionsRatios.length,
       outliersRemoved: outliersRemoved,
       outlierPercentage: parseFloat(((outliersRemoved/emissionsRatios.length)*100).toFixed(2)),
-      standardDeviation: this.calculateStandardDeviation(cleanedData),
+      standardDeviation: this.calculateStandardDeviation(cleanedData) * 1000,
       median: this.calculateMedian(cleanedData),
       min: Math.min(...cleanedData),
       max: Math.max(...cleanedData)
     };
-  }
-
-  /**
-   * Group companies by their industry category and revenue range using only valid CATEGORY_SCHEMA categories
-   */
-  private groupCompaniesByIndustryFromSchema(companies: any[]): Record<string, Record<string, any[]>> {
-    const grouped: Record<string, Record<string, any[]>> = {};
-    
-    companies.forEach(company => {
-      const industry = company.category;
-      const revenue = this.parseNumericValue(company.revenue);
-      const revenueRange = this.getRevenueRangeForCompany(revenue);
-      
-      // Only group if the industry is in CATEGORY_SCHEMA and has valid revenue
-      if (this.isValidIndustryCategory(industry) && revenue > 0) {
-        if (!grouped[industry]) {
-          grouped[industry] = {};
-        }
-        if (!grouped[industry][revenueRange]) {
-          grouped[industry][revenueRange] = [];
-        }
-        grouped[industry][revenueRange].push(company);
-      }
-    });
-    
-    return grouped;
-  }
-
-  /**
-   * Get list of all companies used in calculations, organized by industry
-   */
-  private getCompaniesUsedInCalculations(companiesByIndustry: Record<string, any[]>): Record<string, any[]> {
-    const companiesUsed: Record<string, any[]> = {};
-    
-    Object.entries(companiesByIndustry).forEach(([industry, companies]) => {
-      if (companies.length >= 3) { // Only industries that have enough data for analysis
-        companiesUsed[industry] = companies.map(company => ({
-          name: company.name,
-          revenue: company.revenue,
-          reportingPeriod: company.reportingPeriod,
-          country: company.country,
-          scope1: company.scope1,
-          scope2Location: company.scope2Location,
-          scope2Market: company.scope2Market,
-          scope3: company.scope3,
-          scope3Categories: {
-            cat1: company.scope3Cat1,
-            cat2: company.scope3Cat2,
-            cat3: company.scope3Cat3,
-            cat4: company.scope3Cat4,
-            cat5: company.scope3Cat5,
-            cat6: company.scope3Cat6,
-            cat7: company.scope3Cat7,
-            cat8: company.scope3Cat8,
-            cat9: company.scope3Cat9,
-            cat10: company.scope3Cat10,
-            cat11: company.scope3Cat11,
-            cat12: company.scope3Cat12,
-            cat13: company.scope3Cat13,
-            cat14: company.scope3Cat14,
-            cat15: company.scope3Cat15
-          }
-        }));
-      }
-    });
-    
-    return companiesUsed;
   }
 
   /**
@@ -3271,6 +3339,44 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         });
       });
       
+      // Always calculate complete ALL_BANDS fallback averages for every category
+      // This ensures ALL_BANDS has complete data even when some specific bands have data
+      this.logger.log(`Calculating complete ALL_BANDS fallback averages for ${industry}`);
+      
+      const fallbackRange = 'ALL_BANDS';
+      if (!results[industry][fallbackRange]) {
+        results[industry][fallbackRange] = {};
+      }
+      if (!companiesUsedSummary[industry][fallbackRange]) {
+        companiesUsedSummary[industry][fallbackRange] = {};
+      }
+      
+      // Calculate fallback for ALL categories (not just those that failed in specific bands)
+      Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
+        const useEmployeeBenchmark = this.shouldUseEmployeeBenchmark(categoryName, industry);
+        
+        // Calculate average using all companies in the industry (no band filtering)
+        const fallbackAverage = this.calculateCategoryAverageForRange(industryCompanies, categoryName, fieldName, industry);
+        
+        if (fallbackAverage) {
+          results[industry][fallbackRange][categoryName] = {
+            ...fallbackAverage,
+            isFallback: true,
+            note: 'Combined across all revenue/employee bands - complete fallback data'
+          };
+          
+          companiesUsedSummary[industry][fallbackRange][categoryName] = {
+            companiesIncluded: fallbackAverage.companiesIncluded,
+            totalCompaniesWithData: fallbackAverage.totalCompaniesWithData,
+            outliersRemoved: fallbackAverage.outliersRemoved,
+            benchmarkType: fallbackAverage.benchmarkType,
+            isFallback: true
+          };
+          
+          this.logger.log(`ALL_BANDS average calculated for ${industry} - ${categoryName}: ${fallbackAverage.average} ${fallbackAverage.benchmarkType} (${fallbackAverage.companiesIncluded} companies used, ${fallbackAverage.outliersRemoved} outliers removed from ${fallbackAverage.totalCompaniesWithData} total)`);
+        }
+      });
+      
       // Remove empty industry entries
       if (Object.keys(results[industry]).length === 0) {
         delete results[industry];
@@ -3284,106 +3390,45 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     };
   }
 
-  /**
-   * Calculate averages for a single industry across all GHG categories with category-specific outlier removal
-   * Returns both averages and summary data to avoid duplicate calculations
-   * Uses appropriate benchmarking (revenue vs employee count) based on category and industry type
-   */
-  private calculateIndustryAveragesWithCategorySpecificOutliers(companies: any[], industryCategory: string): { averages: any; summary: Record<string, any> } {
-    const ghgCategories = this.getGhgCategoryMappings();
-    const averages: Record<string, any> = {};
-    const summary: Record<string, any> = {};
-    
-    Object.entries(ghgCategories).forEach(([categoryName, fieldName]) => {
-      // Determine which benchmark to use for this category and industry
-      const useEmployeeBenchmark = this.shouldUseEmployeeBenchmark(categoryName, industryCategory);
-      
-      // Calculate emissions ratios using appropriate benchmark
-      const emissionsRatios = useEmployeeBenchmark 
-        ? this.calculateEmissionsPerEmployeeForCategory(companies, fieldName)
-        : this.calculateEmissionsPerDollarForCategory(companies, fieldName);
-      
-      const benchmarkUnit = useEmployeeBenchmark ? 'kg CO2e/employee' : 'kg CO2e/USD';
-      const benchmarkType = useEmployeeBenchmark ? 'employee' : 'revenue';
-      
-      // Track summary data for this category
-      summary[categoryName] = {
-        totalCompaniesInSegment: companies.length,
-        companiesWithValidData: emissionsRatios.length,
-        companiesAfterOutlierRemoval: 0,
-        outliersRemoved: 0,
-        benchmarkType: benchmarkType
-      };
-      
-      if (emissionsRatios.length > 0) {
-        // Remove outliers specific to this category
-        const cleanedData = this.removeOutliers(emissionsRatios);
-        const outliersRemoved = emissionsRatios.length - cleanedData.length;
-        
-        // Update summary with actual outlier data
-        summary[categoryName].companiesAfterOutlierRemoval = cleanedData.length;
-        summary[categoryName].outliersRemoved = outliersRemoved;
-        
-        if (cleanedData.length >= 3) {
-          // Log outlier removal for transparency
-          if (outliersRemoved > 0) {
-            this.logger.debug(`${categoryName} (${benchmarkType}): Removed ${outliersRemoved} outliers from ${emissionsRatios.length} companies (${((outliersRemoved/emissionsRatios.length)*100).toFixed(1)}%)`);
-          }
-          
-          const averageKey = useEmployeeBenchmark ? 'averageEmissionsPerEmployee' : 'averageEmissionsPerDollar';
-          
-          averages[categoryName] = {
-            [averageKey]: this.calculateMean(cleanedData),
-            unit: benchmarkUnit,
-            benchmarkType: benchmarkType,
-            companiesIncluded: cleanedData.length,
-            totalCompaniesWithData: emissionsRatios.length,
-            outliersRemoved: outliersRemoved,
-            outlierPercentage: parseFloat(((outliersRemoved/emissionsRatios.length)*100).toFixed(2)),
-            standardDeviation: this.calculateStandardDeviation(cleanedData),
-            median: this.calculateMedian(cleanedData),
-            min: Math.min(...cleanedData),
-            max: Math.max(...cleanedData)
-          };
-        } else {
-          this.logger.warn(`${categoryName} (${benchmarkType}): Insufficient data after outlier removal (${cleanedData.length} companies remaining, minimum 3 required)`);
-        }
-      } else {
-        this.logger.warn(`${categoryName} (${benchmarkType}): No companies with valid data for this category`);
-      }
-    });
-    
-    return {
-      averages: {
-        totalCompanies: companies.length,
-        categories: averages
-      },
-      summary
-    };
-  }
-
 
 
   /**
    * Calculate emissions per dollar for a specific category
-   * Converts from tons CO2e to kg CO2e before calculating ratio
-   * IMPORTANT: Only includes companies with valid numeric values for both emissions and revenue
+   * IMPORTANT: Filter invalid inputs first; perform kg conversion at the very end
    */
-  private calculateEmissionsPerDollarForCategory(companies: any[], fieldName: string): number[] {
-    return companies
-      .map(company => {
-        const emissionsInTons = this.parseNumericValue(company[fieldName]);
-        const revenue = this.parseNumericValue(company.revenue);
-        
-        // Only calculate ratio if both values are valid positive numbers
-        if (emissionsInTons > 0 && revenue > 0) {
-          // Convert tons CO2e to kg CO2e (multiply by 1000)
-          const emissionsInKg = emissionsInTons * 1000;
-          return emissionsInKg / revenue;
-        }
-        return null;
-      })
-      .filter(value => value !== null) as number[];
+  private calculateEmissionsPerDollarForCategory(companies: any[], fieldName: string): {ratiosInTonsPerDollar: number[], valuesForLogging: any[]} {
+    // Exclude companies without valid positive emissions and revenue
+    const valuesForLogging = [];
+    const validCompanies = companies.filter(company => {
+      const emissionsInTons = this.parseNumericValue(company[fieldName]);
+      valuesForLogging.push({emissionsInTons, revenue: company.revenue, name: company.name});
+      const revenue = this.parseNumericValue(company.revenue);
+      const hasValidEmissions = this.isValidValue(emissionsInTons) && emissionsInTons > 0;
+      const hasValidRevenue = this.isValidValue(revenue) && revenue > 0;
+      return hasValidEmissions && hasValidRevenue;
+    });
+
+    const ratiosInTonsPerDollar = validCompanies.map(company => {
+      const emissionsInTons = this.parseNumericValue(company[fieldName]);
+      const revenue = this.parseNumericValue(company.revenue);
+      return emissionsInTons / revenue;
+    });
+
+    if (ratiosInTonsPerDollar.length === 0) {
+      return {ratiosInTonsPerDollar, valuesForLogging};
+    }
+
+    // Apply general outlier detection for revenue-based ratios (in tons/USD)
+    const filteredRatiosInTonsPerDollar = this.removeOutliers(ratiosInTonsPerDollar, 'revenue');
+
+    const totalFiltered = ratiosInTonsPerDollar.length - filteredRatiosInTonsPerDollar.length;
+    if (totalFiltered > 0) {
+      this.logger.log(`Revenue-based calculation for ${fieldName}: ${totalFiltered} out of ${ratiosInTonsPerDollar.length} ratios filtered as outliers (${(totalFiltered/ratiosInTonsPerDollar.length*100).toFixed(1)}%)`);
+    }
+
+    // Convert to kg CO2e per USD at the very end
+
+    return {ratiosInTonsPerDollar, valuesForLogging};
   }
 
   /**
@@ -3400,22 +3445,48 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       if (trimmed === '' || trimmed.toLowerCase() === 'n/a' || trimmed.toLowerCase() === 'not specified') {
         return 0;
       }
-      const parsed = parseFloat(trimmed);
-      return isNaN(parsed) ? 0 : parsed;
+
+      // Support negatives in parentheses e.g., "(1,234.56)"
+      const isNegativeInParens = /^\(.*\)$/.test(trimmed);
+      const withoutParens = isNegativeInParens ? trimmed.slice(1, -1) : trimmed;
+
+      // Remove leading currency/symbols and trailing units, keep core numeric part
+      // Also remove thousands separators (commas) before parsing
+      const cleaned = withoutParens
+        .replace(/^[^0-9\-\.]+/, '') // strip non-numeric prefix
+        .replace(/[,\s]/g, '') // remove thousands separators and spaces
+        .replace(/[^0-9\-\.].*$/, ''); // strip any trailing non-numeric content
+
+      const parsed = parseFloat(cleaned);
+      if (isNaN(parsed)) {
+        return 0;
+      }
+      return isNegativeInParens ? -parsed : parsed;
     }
     return 0;
   }
 
   /**
-   * Remove outliers using the Interquartile Range (IQR) method with stricter bounds
-   * This operates on emissions per dollar ratios, NOT raw emissions data
+   * Remove outliers using density-based clustering to find the main group of closely clustered values
+   * This identifies the largest cluster of values that are close together and excludes isolated outliers
    */
-  private removeOutliers(data: number[]): number[] {
-    if (data.length <= 3) {
-      return data; // Can't calculate quartiles with less than 4 data points
+  /**
+   * Remove low emission outliers using interquartile range (IQR) method
+   * Only removes values below the lower threshold to exclude low emissions
+   * @param data Array of emissions ratios
+   * @param benchmarkType Type of benchmark for logging purposes
+   * @returns Filtered array with low outliers removed
+   */
+  private removeOutliers(data: number[], benchmarkType: 'employee' | 'revenue' = 'revenue'): number[] {
+    if (data.length <= 4) {
+      return data; // Need at least 5 data points for meaningful outlier detection
     }
     
+    this.logger.log(`Removing low emission outliers from ${data.length} data points using IQR method (${benchmarkType} benchmark)`);
+    
     const sorted = [...data].sort((a, b) => a - b);
+    
+    // Calculate quartiles
     const q1Index = Math.floor(sorted.length * 0.25);
     const q3Index = Math.floor(sorted.length * 0.75);
     
@@ -3423,12 +3494,30 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     const q3 = sorted[q3Index];
     const iqr = q3 - q1;
     
-    // Stricter outlier bounds: reduced from 1.5 to 1.0 for more aggressive outlier removal
-    const lowerBound = q1 - (1.0 * iqr);
-    const upperBound = q3 + (1.0 * iqr);
+    // Conservative IQR multiplier for lower bound only
+    const iqrMultiplier = benchmarkType === 'employee' ? 1.5 : 1.5;
+    const lowerBound = q1 - (1 * iqr);
+    const highBound = q3 + (iqrMultiplier * iqr);
     
-    return data.filter(value => value >= lowerBound && value <= upperBound);
+    // Only filter out values below the lower bound (low emissions)
+    // Keep all high values to avoid excluding companies with legitimate high emissions
+    const filtered = data.filter(value => value >= lowerBound && value <= highBound);
+    
+    const removedCount = data.length - filtered.length;
+    const removalPercentage = (removedCount / data.length * 100).toFixed(1);
+    
+    this.logger.log(`IQR filtering: ${removedCount} low outliers removed (${removalPercentage}%), ${filtered.length} data points remaining`);
+    
+    if (removedCount > 0) {
+      const originalMin = Math.min(...data);
+      const filteredMin = Math.min(...filtered);
+      this.logger.log(`Low emissions filtered: minimum value ${originalMin.toFixed(6)} → ${filteredMin.toFixed(6)}`);
+    }
+    
+    return filtered;
   }
+
+
 
   /**
    * Calculate the mean of an array of numbers
@@ -3890,7 +3979,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   /**
    * Calculate emissions per employee for a specific category/field
    */
-  private calculateEmissionsPerEmployeeForCategory(companies: any[], fieldName: string): number[] {
+  private calculateEmissionsPerEmployeeForCategory(companies: any[], fieldName: string, categoryName?: string): number[] {
     const validCompanies = companies.filter(company => {
       // Must have valid emissions data for this category and employee count > 0
       const emissionsValue = this.parseNumericValue(company[fieldName]);
@@ -3903,12 +3992,20 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       return hasValidEmissions && hasValidEmployeeCount;
     });
 
-    return validCompanies.map(company => {
+    const ratios = validCompanies.map(company => {
       const emissionsValue = this.parseNumericValue(company[fieldName]);
       const employeeCount = this.parseNumericValue(company.employeeCount);
-      // Convert tons to kg and calculate per employee
-      return (emissionsValue * 1000) / employeeCount;
+      return (emissionsValue) / employeeCount;
     });
+
+    if (ratios.length === 0) {
+      return ratios;
+    }
+
+    // Apply general outlier detection first
+    let filteredRatios = this.removeOutliers(ratios, 'employee');
+
+    return filteredRatios;
   }
 
   /**
@@ -4536,5 +4633,88 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       console.log(`[ERROR] Error appending match to sheet: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Validate data quality for companies fetched from the sheet
+   * - Missing categories
+   * - Duplicate revenues by (company, revenueYear)
+   * - Any emission values or revenues below 0
+   */
+  async validateCompaniesDataQuality({ fromRow, toRow }: { fromRow?: number; toRow?: number } = {}) {
+    const companies = await this.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10700 });
+
+    const missingCategories: Array<{ name: string; revenueYear: any; category: any }> = [];
+    const negativeRevenues: Array<{ name: string; revenueYear: any; revenue: number }> = [];
+    const negativeEmissions: Array<{ name: string; revenueYear: any; fields: string[] }> = [];
+    const duplicateRevenues: Array<{ name: string; revenueYear: any; revenue: number; count: number }> = [];
+
+    // Track duplicates by composite key (company + year + parsed revenue)
+    const duplicatesMap = new Map<string, { count: number; sample: any }>();
+
+    const emissionFields = [
+      'scope1', 'scope2Location', 'scope2Market', 'scope3',
+      'scope3Cat1','scope3Cat2','scope3Cat3','scope3Cat4','scope3Cat5','scope3Cat6','scope3Cat7','scope3Cat8','scope3Cat9','scope3Cat10','scope3Cat11','scope3Cat12','scope3Cat13','scope3Cat14','scope3Cat15'
+    ];
+
+    for (const company of companies) {
+      const { name, revenueYear, category } = company;
+
+      // Missing category
+      if (!category || (typeof category === 'string' && category.trim() === '')) {
+        missingCategories.push({ name, revenueYear, category });
+      }
+
+      // Revenue checks
+      const parsedRevenue = this.parseNumericValue(company.revenue);
+      if (parsedRevenue < 0) {
+        negativeRevenues.push({ name, revenueYear, revenue: parsedRevenue });
+      }
+
+      const dupKey = `${String(name)}|${String(revenueYear)}|${parsedRevenue}`;
+      if (!duplicatesMap.has(dupKey)) {
+        duplicatesMap.set(dupKey, { count: 1, sample: company });
+      } else {
+        const existing = duplicatesMap.get(dupKey)!;
+        existing.count += 1;
+        duplicatesMap.set(dupKey, existing);
+      }
+
+      // Emission negative checks
+      const negativeFields: string[] = [];
+      for (const field of emissionFields) {
+        const value = this.parseNumericValue(company[field]);
+        if (value < 0) {
+          negativeFields.push(field);
+        }
+      }
+      if (negativeFields.length > 0) {
+        negativeEmissions.push({ name, revenueYear, fields: negativeFields });
+      }
+    }
+
+    // Collect duplicates where count > 1 and revenue is a valid number
+    for (const [key, entry] of duplicatesMap.entries()) {
+      const [name, revenueYearStr, revenueStr] = key.split('|');
+      const revenue = Number(revenueStr);
+      if (entry.count > 1 && !Number.isNaN(revenue)) {
+        duplicateRevenues.push({ name, revenueYear: revenueYearStr, revenue, count: entry.count });
+      }
+    }
+
+    return {
+      success: true,
+      totalCompanies: companies.length,
+      counts: {
+        missingCategories: missingCategories.length,
+        duplicateRevenues: duplicateRevenues.length,
+        negativeRevenues: negativeRevenues.length,
+        negativeEmissions: negativeEmissions.length,
+      },
+      missingCategories,
+      duplicateRevenues,
+      negativeRevenues,
+      negativeEmissions,
+    };
   }
 }

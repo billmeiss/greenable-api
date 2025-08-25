@@ -644,12 +644,84 @@ Extra-territorial organizations and bodies
       model: 'gemini-2.5-pro',
       generationConfig: {
         temperature: 0.0,
-        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            employeeCount: { type: Type.NUMBER },
+          }
+        }
       },
       systemInstruction: `You will return responses in this JSON format:
             {
-              "employees": 0,
+              "employeeCount": 0,
             }`
+    }
+
+    this.modelConfigs.employeeSearch = {
+      model: 'gemini-2.5-flash-lite',
+      generationConfig: {
+        temperature: 0.0,
+        tools: [{ googleSearch: {} }],
+      },
+      systemInstruction: `You are a research assistant that searches for employee count information about companies.
+
+When given a company name and year, use Google Search to find the total number of employees for that company.
+
+Guidelines:
+- Search for official company sources (annual reports, sustainability/ESG reports, investor relations, 10-K/20-F filings)
+- Look for the most recent available data for the specified year or closest previous year
+- Ensure you're finding information about the correct company (not similarly named entities)
+- Focus on reliable, authoritative sources
+
+Provide a comprehensive summary of what you found, including:
+- The employee count if found
+- The source where you found this information
+- The year the data is from
+- Your confidence in the accuracy of the information
+- Any relevant context or notes
+
+If you cannot find reliable information, clearly state that no reliable employee count data was found.`
+    }
+
+    this.modelConfigs.employeeSearchJsonExtractor = {
+      model: 'gemini-2.5-flash-lite',
+      generationConfig: {
+        temperature: 0.0,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            employeeCount: { type: Type.NUMBER },
+            source: { type: Type.STRING },
+            year: { type: Type.STRING },
+            confidence: { type: Type.NUMBER },
+            notes: { type: Type.STRING },
+          }
+        }
+      },
+      systemInstruction: `You will extract employee count information from the provided search results and return it in JSON format.
+
+Analyze the search results to find:
+- The total number of employees
+- The source of this information
+- The year this data is from
+- Your confidence level (0-10, where 10 is most confident)
+- Any relevant notes or context
+
+Rules:
+- Only extract information if you find a clear, reliable employee count
+- If no reliable employee count is found, set employeeCount to null
+- Prefer official company sources over third-party estimates
+- Confidence should reflect the reliability and recency of the source
+
+You will return responses in this JSON format:
+{
+  "employeeCount": number | null,
+  "source": "Name of the source where information was found",
+  "year": "Year the data is from",
+  "confidence": 0-10,
+  "notes": "Any additional context or explanation"
+}`
     }
 
     this.modelConfigs.revenueConversion = {

@@ -68,10 +68,10 @@ export class GeminiApiService {
           error.message?.includes('quota exceeded') || error.message?.includes('RESOURCE_EXHAUSTED');
               
           // Kill the process if we get a rate limit error
-          if (isRateLimitError) {
-          this.logger.error(`Fatal error from Gemini API: ${error.message}. Killing process.`);
-          process.exit(1);
-          }
+          // if (isRateLimitError) {
+          // this.logger.error(`Fatal error from Gemini API: ${error.message}. Killing process.`);
+          // process.exit(1);
+          // }
           throw error;
         }
         

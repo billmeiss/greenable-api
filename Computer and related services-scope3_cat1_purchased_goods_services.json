@@ -1,0 +1,852 @@
+[
+  {
+    "emissionsInTons": 178.16,
+    "revenue": "2,095,938,999.00",
+    "name": "Globant"
+  },
+  {
+    "emissionsInTons": 9511,
+    "revenue": "234,285,000.00",
+    "name": "Appen Limited"
+  },
+  {
+    "emissionsInTons": 3222,
+    "revenue": "99,376,044.17",
+    "name": "SiteMinder Limited"
+  },
+  {
+    "emissionsInTons": 111088,
+    "revenue": "4,358,603,000.00",
+    "name": "Atlassian"
+  },
+  {
+    "emissionsInTons": 1472.53,
+    "revenue": "204,658,826.46",
+    "name": "Hansen Technologies Ltd"
+  },
+  {
+    "emissionsInTons": 122.8,
+    "revenue": "394,822,250.38",
+    "name": "CI&T Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "345,450,325.14",
+    "name": "Alithya Group Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "18,240,000,000.00",
+    "name": "Baidu"
+  },
+  {
+    "emissionsInTons": 2470.55,
+    "revenue": "44,597,742.79",
+    "name": "NaaS Technology Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "310,392,085.83",
+    "name": "Weimob Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "892,900,000.00",
+    "name": "Avast plc"
+  },
+  {
+    "emissionsInTons": 3852,
+    "revenue": "95,898,240.00",
+    "name": "Adform A/S"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "21,600,000.00",
+    "name": "Logpoint"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "799,723,490.00",
+    "name": "Netcompany Group A/S"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "429,000,000.00",
+    "name": "Giza Systems"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "22,676,838.85",
+    "name": "Silo AI"
+  },
+  {
+    "emissionsInTons": 189227,
+    "revenue": "3,079,082,775.86",
+    "name": "Tietoevry"
+  },
+  {
+    "emissionsInTons": 7915,
+    "revenue": "154,335,107.55",
+    "name": "WithSecure Corporation"
+  },
+  {
+    "emissionsInTons": 6509,
+    "revenue": "157,958,640.00",
+    "name": "F-Secure Corporation"
+  },
+  {
+    "emissionsInTons": 4015.91,
+    "revenue": "189,491,400.00",
+    "name": "Basware"
+  },
+  {
+    "emissionsInTons": 509.7,
+    "revenue": "247,395,120.00",
+    "name": "RELEX Solutions"
+  },
+  {
+    "emissionsInTons": 995770,
+    "revenue": "576,072,000.00",
+    "name": "Scalian"
+  },
+  {
+    "emissionsInTons": 712813.7,
+    "revenue": "2,963,520,000.00",
+    "name": "Econocom Group SE"
+  },
+  {
+    "emissionsInTons": 999765,
+    "revenue": "10,030,519,928.03",
+    "name": "Atos SE"
+  },
+  {
+    "emissionsInTons": 917,
+    "revenue": "967,679,000.00",
+    "name": "OVH Groupe S.A."
+  },
+  {
+    "emissionsInTons": 248879,
+    "revenue": "6,050,361,023.31",
+    "name": "Sopra Steria"
+  },
+  {
+    "emissionsInTons": 5616,
+    "revenue": "206,163,780.77",
+    "name": "Esker"
+  },
+  {
+    "emissionsInTons": 409105,
+    "revenue": "23,187,926,043.22",
+    "name": "Capgemini SE"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,933,000,000.00",
+    "name": "Criteo S.A."
+  },
+  {
+    "emissionsInTons": 1578,
+    "revenue": "197,936,407.66",
+    "name": "Linedata Services"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "4,393,440,000.00",
+    "name": "ALTEN"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "3,382,166,619.00",
+    "name": "Dassault Systèmes"
+  },
+  {
+    "emissionsInTons": 2553,
+    "revenue": "565,885,968.16",
+    "name": "Aubay"
+  },
+  {
+    "emissionsInTons": 1178.58,
+    "revenue": "291,907,471.79",
+    "name": "Visiativ SA"
+  },
+  {
+    "emissionsInTons": 149.76,
+    "revenue": "277,698,771.00",
+    "name": "SQLI"
+  },
+  {
+    "emissionsInTons": 412.26,
+    "revenue": "800,384,426.41",
+    "name": "NEURONES"
+  },
+  {
+    "emissionsInTons": 2327,
+    "revenue": "1,031,347,920.00",
+    "name": "Wavestone"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "535,605,336.62",
+    "name": "Claranova"
+  },
+  {
+    "emissionsInTons": 32917.33,
+    "revenue": "1,246,305,960.00",
+    "name": "CompuGroup Medical SE & Co. KGaA"
+  },
+  {
+    "emissionsInTons": 897000,
+    "revenue": "33,698,862,378.58",
+    "name": "SAP SE"
+  },
+  {
+    "emissionsInTons": 30856,
+    "revenue": "1,042,710,094.20",
+    "name": "Nemetschek Group"
+  },
+  {
+    "emissionsInTons": 3972,
+    "revenue": "141,555,280.45",
+    "name": "IVU Traffic Technologies AG"
+  },
+  {
+    "emissionsInTons": 13344,
+    "revenue": "703,194,223.63",
+    "name": "TeamViewer SE"
+  },
+  {
+    "emissionsInTons": 6146,
+    "revenue": "912,162,516.00",
+    "name": "GFT Technologies SE"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "75,135,600.00",
+    "name": "EQS Group AG"
+  },
+  {
+    "emissionsInTons": 1435,
+    "revenue": "593,159,095.34",
+    "name": "Scout24 SE"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,031,867,000.00",
+    "name": "Info Quest Technologies"
+  },
+  {
+    "emissionsInTons": 40311,
+    "revenue": "304,236,111.00",
+    "name": "4iG Nyrt."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "280,647,688.19",
+    "name": "Info Edge (India) Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "202,526,055.00",
+    "name": "Intellect Design Arena Ltd."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "622,704,819.00",
+    "name": "Tata Technologies Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "275,049,383.00",
+    "name": "Cyient Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "977,700,000.00",
+    "name": "L&T Technology Services"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "354,000,000.00",
+    "name": "eClerx Services Limited"
+  },
+  {
+    "emissionsInTons": 3744.97,
+    "revenue": "1,256,694,915.00",
+    "name": "Hexaware Technologies"
+  },
+  {
+    "emissionsInTons": 33968,
+    "revenue": "11,157,644,172.00",
+    "name": "Wipro Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "592,300,000.00",
+    "name": "Zensar Technologies Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "6,607,000,000.00",
+    "name": "Tech Mahindra"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "4,106,321,839.00",
+    "name": "LTIMindtree"
+  },
+  {
+    "emissionsInTons": 5153.63,
+    "revenue": "1,186,050,000.00",
+    "name": "Persistent"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "18,562,000,000.00",
+    "name": "Infosys Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "46,018,707.00",
+    "name": "Infobeans Technologies Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,040,157,481.00",
+    "name": "Sonata Software Limited"
+  },
+  {
+    "emissionsInTons": 250369,
+    "revenue": "64,896,464,000.00",
+    "name": "Accenture"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,842,979,088.72",
+    "name": "Playtech plc"
+  },
+  {
+    "emissionsInTons": 2973,
+    "revenue": "2,485,020,523.00",
+    "name": "Reply S.p.A."
+  },
+  {
+    "emissionsInTons": 353,
+    "revenue": "656,119,440.00",
+    "name": "NTT DATA Italia S.p.A."
+  },
+  {
+    "emissionsInTons": 2185193,
+    "revenue": "24,020,688,373.63",
+    "name": "NTT DATA Group Corporation"
+  },
+  {
+    "emissionsInTons": 287512,
+    "revenue": "2,552,703,448.00",
+    "name": "BIPROGY Inc."
+  },
+  {
+    "emissionsInTons": 148000,
+    "revenue": "4,826,908,048.33",
+    "name": "Nomura Research Institute, Ltd."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,389,968,000.00",
+    "name": "Atento"
+  },
+  {
+    "emissionsInTons": 155600,
+    "revenue": "3,013,200,000.00",
+    "name": "United Group B.V."
+  },
+  {
+    "emissionsInTons": 1387266,
+    "revenue": "31,744,000,000.00",
+    "name": "Prosus N.V."
+  },
+  {
+    "emissionsInTons": 13679,
+    "revenue": "601,581,925.16",
+    "name": "TomTom N.V."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "151,371,150.00",
+    "name": "ORTEC International B.V."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "595,296,000.00",
+    "name": "Azerion Group N.V."
+  },
+  {
+    "emissionsInTons": 15980,
+    "revenue": "73,383,175.13",
+    "name": "EROAD Limited"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "907,112,836.41",
+    "name": "Xero"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "41,073,751.00",
+    "name": "Serko Ltd"
+  },
+  {
+    "emissionsInTons": 776387,
+    "revenue": "3,095,213,503.77",
+    "name": "Atea ASA"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "12,984,000.00",
+    "name": "Documaster"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "371,900,827.00",
+    "name": "Bouvet ASA"
+  },
+  {
+    "emissionsInTons": 208368,
+    "revenue": "293,355,146.29",
+    "name": "CD PROJEKT GROUP"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "481,261,436.17",
+    "name": "Netmarble"
+  },
+  {
+    "emissionsInTons": 112260,
+    "revenue": "10,173,826,820.00",
+    "name": "Samsung SDS Co., Ltd."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,016,419,214.00",
+    "name": "NCSOFT Corporation"
+  },
+  {
+    "emissionsInTons": 236025,
+    "revenue": "4,689,863,992.96",
+    "name": "Indra"
+  },
+  {
+    "emissionsInTons": 139948,
+    "revenue": "6,669,885,200.00",
+    "name": "Amadeus IT Group, S.A."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "176,122,188.00",
+    "name": "Altia Consultores, S.A."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "68,200,000.00",
+    "name": "Infobric"
+  },
+  {
+    "emissionsInTons": 4700,
+    "revenue": "146,900,000.00",
+    "name": "Cint Group AB (publ)"
+  },
+  {
+    "emissionsInTons": 1618,
+    "revenue": "157,129,187.00",
+    "name": "Fortnox AB"
+  },
+  {
+    "emissionsInTons": 102,
+    "revenue": "465,454,545.00",
+    "name": "Proact IT Group AB"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "29,155,935.66",
+    "name": "Rillion"
+  },
+  {
+    "emissionsInTons": 2132,
+    "revenue": "675,271,344.00",
+    "name": "Knowit AB (publ)"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "11,001,263,056.70",
+    "name": "Enea"
+  },
+  {
+    "emissionsInTons": 48221,
+    "revenue": "1,000,224,000.00",
+    "name": "Temenos AG"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "394,096,145.00",
+    "name": "Metaage Corporation"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "50,490,981.22",
+    "name": "Galaxy Software Services"
+  },
+  {
+    "emissionsInTons": 18424.61,
+    "revenue": "573,087,248.00",
+    "name": "D-Link Corporation"
+  },
+  {
+    "emissionsInTons": 70321.13,
+    "revenue": "383,649,396.00",
+    "name": "Faraday Technology Corporation"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "124,119,798.00",
+    "name": "Integrated Service Technology Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,855,248,537.00",
+    "name": "The Access Group"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "113,166,885.34",
+    "name": "Frontier Developments PLC"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "309,834,435.00",
+    "name": "FD Technologies plc"
+  },
+  {
+    "emissionsInTons": 141420.9,
+    "revenue": "233,200,000.00",
+    "name": "Bytes Technology Group plc"
+  },
+  {
+    "emissionsInTons": 84060.1,
+    "revenue": "2,745,015,233.33",
+    "name": "Sage Group plc"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "287,259,059.25",
+    "name": "Zellis Group"
+  },
+  {
+    "emissionsInTons": 11311,
+    "revenue": "939,050,625.29",
+    "name": "Endava"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "3,537,600,675.70",
+    "name": "Capita plc"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "99,899,845.00",
+    "name": "dotdigital GROUP PLC"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "55,345,015.00",
+    "name": "Cerillion plc"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,015,400,000.00",
+    "name": "Unisys Corporation"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "16,500,000,000.00",
+    "name": "Automatic Data Processing, Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "535,404,000.00",
+    "name": "Rapid7"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "102,000,000.00",
+    "name": "Stack Overflow"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,343,000,000.00",
+    "name": "CyrusOne"
+  },
+  {
+    "emissionsInTons": 94208,
+    "revenue": "5,304,800,000.00",
+    "name": "Fortinet"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "5,564,500,000.00",
+    "name": "Juniper Networks"
+  },
+  {
+    "emissionsInTons": 208724,
+    "revenue": "6,892,700,000.00",
+    "name": "Palo Alto Networks"
+  },
+  {
+    "emissionsInTons": 215909,
+    "revenue": "6,362,000,000.00",
+    "name": "NetApp"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "8,188,136,000.00",
+    "name": "Equinix Inc."
+  },
+  {
+    "emissionsInTons": 6282,
+    "revenue": "207,539,000.00",
+    "name": "Schrödinger, Inc."
+  },
+  {
+    "emissionsInTons": 63165,
+    "revenue": "2,300,000,000.00",
+    "name": "Genesys"
+  },
+  {
+    "emissionsInTons": 594010,
+    "revenue": "13,667,000,000.00",
+    "name": "DXC Technology"
+  },
+  {
+    "emissionsInTons": 5564000,
+    "revenue": "211,915,000,000.00",
+    "name": "Microsoft"
+  },
+  {
+    "emissionsInTons": 123341,
+    "revenue": "3,562,000,000.00",
+    "name": "Cadence Design Systems, Inc."
+  },
+  {
+    "emissionsInTons": 505259,
+    "revenue": "16,052,000,000.00",
+    "name": "Kyndryl"
+  },
+  {
+    "emissionsInTons": 362507,
+    "revenue": "15,000,000,000.00",
+    "name": "SHI International Corp."
+  },
+  {
+    "emissionsInTons": 106793.97,
+    "revenue": "6,324,473,000.00",
+    "name": "Concentrix Corporation"
+  },
+  {
+    "emissionsInTons": 666279,
+    "revenue": "19,428,000,000.00",
+    "name": "Cognizant"
+  },
+  {
+    "emissionsInTons": 89560,
+    "revenue": "5,320,000,000.00",
+    "name": "Synopsys, Inc."
+  },
+  {
+    "emissionsInTons": 46493.5,
+    "revenue": "2,077,702,000.00",
+    "name": "Jack Henry & Associates, Inc."
+  },
+  {
+    "emissionsInTons": 37567,
+    "revenue": "1,020,000,000.00",
+    "name": "Ceridian HCM, Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "3,811,920,000.00",
+    "name": "Akamai Technologies, Inc."
+  },
+  {
+    "emissionsInTons": 4038000,
+    "revenue": "307,263,157,895.00",
+    "name": "Alphabet Inc. (Google)"
+  },
+  {
+    "emissionsInTons": 24430,
+    "revenue": "1,058,581,000.00",
+    "name": "UiPath Inc."
+  },
+  {
+    "emissionsInTons": 13987.88,
+    "revenue": "579,906,000.00",
+    "name": "GitLab Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,263,000,000.00",
+    "name": "Okta Inc."
+  },
+  {
+    "emissionsInTons": 14184,
+    "revenue": "3,338,000,000.00",
+    "name": "F5, Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,009,418,000.00",
+    "name": "Extreme Networks Inc."
+  },
+  {
+    "emissionsInTons": 421243,
+    "revenue": "12,700,000,000.00",
+    "name": "Intuit Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "3,521,000,000.00",
+    "name": "Genpact Limited"
+  },
+  {
+    "emissionsInTons": 161479,
+    "revenue": "7,259,000,000.00",
+    "name": "Workday Inc."
+  },
+  {
+    "emissionsInTons": 29320,
+    "revenue": "1,430,530,000.00",
+    "name": "Dynatrace Inc."
+  },
+  {
+    "emissionsInTons": 42517,
+    "revenue": "2,085,508,000.00",
+    "name": "FactSet Research Systems Inc."
+  },
+  {
+    "emissionsInTons": 683000,
+    "revenue": "34,900,000,000.00",
+    "name": "Salesforce"
+  },
+  {
+    "emissionsInTons": 82589,
+    "revenue": "3,055,071,000.00",
+    "name": "Pinterest, Inc."
+  },
+  {
+    "emissionsInTons": 511376,
+    "revenue": "19,409,000,000.00",
+    "name": "Adobe Inc."
+  },
+  {
+    "emissionsInTons": 240663,
+    "revenue": "11,767,000,000.00",
+    "name": "VMware"
+  },
+  {
+    "emissionsInTons": 30460,
+    "revenue": "1,862,895,000.00",
+    "name": "Nutanix"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "3,338,000,000.00",
+    "name": "Gen Digital Inc."
+  },
+  {
+    "emissionsInTons": 12905,
+    "revenue": "1,250,000,000.00",
+    "name": "MathWorks"
+  },
+  {
+    "emissionsInTons": 6718,
+    "revenue": "1,630,670,000.00",
+    "name": "EXL Service"
+  },
+  {
+    "emissionsInTons": 39281,
+    "revenue": "3,000,000,000.00",
+    "name": "SAS Institute Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,796,000,000.00",
+    "name": "NortonLifeLock Inc."
+  },
+  {
+    "emissionsInTons": 54273,
+    "revenue": "2,170,230,000.00",
+    "name": "HubSpot Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,616,952,000.00",
+    "name": "Zscaler Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,670,000,000.00",
+    "name": "Cloudflare"
+  },
+  {
+    "emissionsInTons": 131770,
+    "revenue": "8,971,000,000.00",
+    "name": "ServiceNow Inc."
+  },
+  {
+    "emissionsInTons": 12797.1,
+    "revenue": "689,136,000.00",
+    "name": "Upwork"
+  },
+  {
+    "emissionsInTons": 74,
+    "revenue": "537,875,000.00",
+    "name": "Workiva Inc."
+  },
+  {
+    "emissionsInTons": 93,
+    "revenue": "4,887,550,000.00",
+    "name": "Amdocs"
+  },
+  {
+    "emissionsInTons": 143000,
+    "revenue": "61,860,000,000.00",
+    "name": "International Business Machines Corporation (IBM)"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "1,300,000,000.00",
+    "name": "Virtusa Corporation"
+  },
+  {
+    "emissionsInTons": 26636.3,
+    "revenue": "6,267,411,000.00",
+    "name": "Gartner, Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,681,400,000.00",
+    "name": "Verisk Analytics"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "471,400,000.00",
+    "name": "Bottomline Technologies, Inc."
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,324,900,000.00",
+    "name": "Dropbox"
+  },
+  {
+    "emissionsInTons": 0,
+    "revenue": "2,469,500,760.00",
+    "name": "FPT Corporation"
+  }
+]

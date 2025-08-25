@@ -1,109 +1,141 @@
-// GOOGLE SHEETS FORMULA FOR COMPLETING EMISSIONS DATA WITH INDUSTRY AVERAGES
-// This formula fills missing Scope 1, Scope 2, and Scope 3 (categories 1-8) data using industry benchmarks
-
-// SETUP INSTRUCTIONS:
-// 1. Create a new sheet called "Industry_Averages" with the following columns:
-//    A: Category, B: Revenue_Band, C: Employee_Band, D: Avg_Scope1_Per_Dollar, 
-//    E: Avg_Scope2_Per_Dollar, F: Avg_Scope3_Cat1_Per_Dollar, G: Avg_Scope3_Cat2_Per_Dollar, 
-//    H: Avg_Scope3_Cat3_Per_Dollar, I: Avg_Scope3_Cat4_Per_Dollar, J: Avg_Scope3_Cat5_Per_Dollar, 
-//    K: Avg_Scope3_Cat6_Per_Dollar, L: Avg_Scope3_Cat7_Per_Dollar, M: Avg_Scope3_Cat8_Per_Dollar
-
-// 2. Define revenue bands: "0-10M", "10M-100M", "100M-1B", "1B+"
-// 3. Define employee bands: "0-100", "100-1000", "1000-10000", "10000+"
-
-// MAIN FORMULA FOR COMPLETED EMISSIONS PER DOLLAR (Place in new column)
 =LET(
-  // Current row data
-  current_revenue, G2,
-  current_employees, H2,
-  current_category, AE2,
-  current_scope1, J2,
-  current_scope2_location, K2,
-  current_scope2_market, L2,
-  current_scope3_cat1, N2,
-  current_scope3_cat2, O2,
-  current_scope3_cat3, P2,
-  current_scope3_cat4, Q2,
-  current_scope3_cat5, R2,
-  current_scope3_cat6, S2,
-  current_scope3_cat7, T2,
-  current_scope3_cat8, U2,
+  current_revenue, F10,
+  current_employees, H10,
+  current_category, AE10,
+  current_scope1, J10,
+  current_scope2_location, K10,
+  current_scope2_market, L10,
+  current_scope3_cat1, N10,
+  current_scope3_cat2, O10,
+  current_scope3_cat3, P10,
+  current_scope3_cat4, Q10,
+  current_scope3_cat5, R10,
+  current_scope3_cat6, S10,
+  current_scope3_cat7, T10,
+  current_scope3_cat8, U10,
   
-  // Determine revenue band
-  revenue_band, IF(current_revenue <= 10000000, "0-10M", 
-                IF(current_revenue <= 100000000, "10M-100M", 
-                IF(current_revenue <= 1000000000, "100M-1B", "1B+"))),
+  revenue_band, IF(current_revenue <= 50000000, "0-50M", 
+                IF(current_revenue <= 250000000, "50M-250M", 
+                IF(current_revenue <= 1000000000, "250M-1B", "1B+"))),
   
-  // Determine employee band
-  employee_band, IF(current_employees <= 100, "0-100", 
-                 IF(current_employees <= 1000, "100-1000", 
-                 IF(current_employees <= 10000, "1000-10000", "10000+"))),
+  employee_band, IF(current_employees <= 100, "1-100", 
+                 IF(current_employees <= 500, "101-500", 
+                 IF(current_employees <= 2000, "501-2000", "2001+"))),
   
-  // Extract industry from category using existing logic
-  industry, IF(OR(REGEXMATCH(current_category, "Cement"), REGEXMATCH(current_category, "Clinker"), REGEXMATCH(current_category, "Concrete")), "Cement",
-           IF(OR(REGEXMATCH(current_category, "Paddy rice"), REGEXMATCH(current_category, "Wheat"), REGEXMATCH(current_category, "Crops"), REGEXMATCH(current_category, "Cattle")), "Agriculture",
-           IF(OR(REGEXMATCH(current_category, "machinery"), REGEXMATCH(current_category, "Capital Goods")), "Capital Goods",
-           IF(OR(REGEXMATCH(current_category, "Chemicals"), REGEXMATCH(current_category, "Plastics")), "Chemicals",
-           IF(OR(REGEXMATCH(current_category, "Coal"), REGEXMATCH(current_category, "Lignite")), "Coal",
-           IF(REGEXMATCH(current_category, "Construction"), "Construction",
-           IF(REGEXMATCH(current_category, "Electricity"), "Electric Utilities",
-           IF(REGEXMATCH(current_category, "Financial"), "Financial Services",
-           IF(OR(REGEXMATCH(current_category, "Food"), REGEXMATCH(current_category, "Beverages")), "Food & Beverage",
-           IF(OR(REGEXMATCH(current_category, "Iron ores"), REGEXMATCH(current_category, "mining")), "Mining",
-           IF(OR(REGEXMATCH(current_category, "Basic iron"), REGEXMATCH(current_category, "steel")), "Metals Processing",
-           IF(OR(REGEXMATCH(current_category, "Crude petroleum"), REGEXMATCH(current_category, "Natural gas")), "Oil and Gas",
-           IF(OR(REGEXMATCH(current_category, "forestry"), REGEXMATCH(current_category, "Wood")), "Forestry",
-           IF(OR(REGEXMATCH(current_category, "Pulp"), REGEXMATCH(current_category, "Paper")), "Paper",
-           IF(REGEXMATCH(current_category, "Real estate"), "Real Estate",
-           IF(OR(REGEXMATCH(current_category, "Motor vehicles"), REGEXMATCH(current_category, "transport equipment")), "Transport Manufacturers",
-           IF(REGEXMATCH(current_category, "transportation services"), "Transport Services", "Other"))))))))))))))))),
+  industry, current_category,
   
-  // Get industry averages using INDEX/MATCH
-  avg_scope1, INDEX(Industry_Averages!D:D, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope2, INDEX(Industry_Averages!E:E, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat1, INDEX(Industry_Averages!F:F, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat2, INDEX(Industry_Averages!G:G, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat3, INDEX(Industry_Averages!H:H, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat4, INDEX(Industry_Averages!I:I, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat5, INDEX(Industry_Averages!J:J, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat6, INDEX(Industry_Averages!K:K, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat7, INDEX(Industry_Averages!L:L, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
-  avg_scope3_cat8, INDEX(Industry_Averages!M:M, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0)),
+  has_valid_employees, AND(NOT(ISBLANK(current_employees)), ISNUMBER(current_employees), current_employees > 0),
   
-  // Calculate completed values (use actual if available, otherwise use average * revenue)
-  // Keep existing data whether it's numbers or strings, only fill truly missing data
-  completed_scope1, IF(AND(NOT(ISBLANK(current_scope1)), current_scope1 <> 0, current_scope1 <> ""), current_scope1, 
-                      IF(ISNUMBER(avg_scope1), avg_scope1 * current_revenue, 0)),
+  specific_match_D, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!D:D, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_D, INDEX(Industry_Averages!D:D, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope1, IF(ISNUMBER(specific_match_D), specific_match_D, IF(ISNUMBER(fallback_match_D), fallback_match_D, "")),
   
-  completed_scope2, IF(AND(NOT(ISBLANK(current_scope2_market)), current_scope2_market <> 0, current_scope2_market <> ""), current_scope2_market,
-                      IF(AND(NOT(ISBLANK(current_scope2_location)), current_scope2_location <> 0, current_scope2_location <> ""), current_scope2_location,
-                        IF(ISNUMBER(avg_scope2), avg_scope2 * current_revenue, 0))),
+  specific_match_E, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!E:E, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_E, INDEX(Industry_Averages!E:E, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope2, IF(ISNUMBER(specific_match_E), specific_match_E, IF(ISNUMBER(fallback_match_E), fallback_match_E, "")),
   
-  completed_scope3_cat1, IF(AND(NOT(ISBLANK(current_scope3_cat1)), current_scope3_cat1 <> 0, current_scope3_cat1 <> ""), current_scope3_cat1, 
-                           IF(ISNUMBER(avg_scope3_cat1), avg_scope3_cat1 * current_revenue, 0)),
+  specific_match_F, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!F:F, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_F, INDEX(Industry_Averages!F:F, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat1, IF(ISNUMBER(specific_match_F), specific_match_F, IF(ISNUMBER(fallback_match_F), fallback_match_F, "")),
   
-  completed_scope3_cat2, IF(AND(NOT(ISBLANK(current_scope3_cat2)), current_scope3_cat2 <> 0, current_scope3_cat2 <> ""), current_scope3_cat2, 
-                           IF(ISNUMBER(avg_scope3_cat2), avg_scope3_cat2 * current_revenue, 0)),
+  specific_match_G, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!G:G, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_G, INDEX(Industry_Averages!G:G, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat2, IF(ISNUMBER(specific_match_G), specific_match_G, IF(ISNUMBER(fallback_match_G), fallback_match_G, "")),
   
-  completed_scope3_cat3, IF(AND(NOT(ISBLANK(current_scope3_cat3)), current_scope3_cat3 <> 0, current_scope3_cat3 <> ""), current_scope3_cat3, 
-                           IF(ISNUMBER(avg_scope3_cat3), avg_scope3_cat3 * current_revenue, 0)),
+  specific_match_H, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!H:H, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_H, INDEX(Industry_Averages!H:H, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat3, IF(ISNUMBER(specific_match_H), specific_match_H, IF(ISNUMBER(fallback_match_H), fallback_match_H, "")),
   
-  completed_scope3_cat4, IF(AND(NOT(ISBLANK(current_scope3_cat4)), current_scope3_cat4 <> 0, current_scope3_cat4 <> ""), current_scope3_cat4, 
-                           IF(ISNUMBER(avg_scope3_cat4), avg_scope3_cat4 * current_revenue, 0)),
+  specific_match_I, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!I:I, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_I, INDEX(Industry_Averages!I:I, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat4, IF(ISNUMBER(specific_match_I), specific_match_I, IF(ISNUMBER(fallback_match_I), fallback_match_I, "")),
   
-  completed_scope3_cat5, IF(AND(NOT(ISBLANK(current_scope3_cat5)), current_scope3_cat5 <> 0, current_scope3_cat5 <> ""), current_scope3_cat5, 
-                           IF(ISNUMBER(avg_scope3_cat5), avg_scope3_cat5 * current_revenue, 0)),
+  specific_match_J, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!J:J, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_J, INDEX(Industry_Averages!J:J, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat5, IF(ISNUMBER(specific_match_J), specific_match_J, IF(ISNUMBER(fallback_match_J), fallback_match_J, "")),
   
-  completed_scope3_cat6, IF(AND(NOT(ISBLANK(current_scope3_cat6)), current_scope3_cat6 <> 0, current_scope3_cat6 <> ""), current_scope3_cat6, 
-                           IF(ISNUMBER(avg_scope3_cat6), avg_scope3_cat6 * current_revenue, 0)),
+  specific_match_K, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!K:K, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_K, INDEX(Industry_Averages!K:K, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat6, IF(ISNUMBER(specific_match_K), specific_match_K, IF(ISNUMBER(fallback_match_K), fallback_match_K, "")),
   
-  completed_scope3_cat7, IF(AND(NOT(ISBLANK(current_scope3_cat7)), current_scope3_cat7 <> 0, current_scope3_cat7 <> ""), current_scope3_cat7, 
-                           IF(ISNUMBER(avg_scope3_cat7), avg_scope3_cat7 * current_revenue, 0)),
+  specific_match_L, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!L:L, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_L, INDEX(Industry_Averages!L:L, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat7, IF(ISNUMBER(specific_match_L), specific_match_L, IF(ISNUMBER(fallback_match_L), fallback_match_L, "")),
   
-  completed_scope3_cat8, IF(AND(NOT(ISBLANK(current_scope3_cat8)), current_scope3_cat8 <> 0, current_scope3_cat8 <> ""), current_scope3_cat8, 
-                           IF(ISNUMBER(avg_scope3_cat8), avg_scope3_cat8 * current_revenue, 0)),
+  specific_match_M, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!M:M, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_M, INDEX(Industry_Averages!M:M, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat8, IF(ISNUMBER(specific_match_M), specific_match_M, IF(ISNUMBER(fallback_match_M), fallback_match_M, "")),
   
-  // Calculate total completed emissions (only sum numerical values)
+  office_based_category, OR(
+    current_category = "Financial intermediation services, except insurance and pension funding services",
+    current_category = "Insurance and pension funding services, except compulsory social security services", 
+    current_category = "Services auxiliary to financial intermediation",
+    current_category = "Financial services nec",
+    current_category = "Research and development services",
+    current_category = "Public administration and defence services; compulsory social security services",
+    current_category = "Education services",
+    current_category = "Health and social work services",
+    current_category = "Membership organisation services n.e.c.",
+    current_category = "Recreational, cultural and sporting services",
+    current_category = "Other services",
+    current_category = "Supporting and auxiliary transport services; travel agency services"
+  ),
+  
+  has_scope1_string, AND(NOT(ISBLANK(current_scope1)), NOT(ISNUMBER(current_scope1))),
+  
+  has_scope2_string, OR(
+    AND(NOT(ISBLANK(current_scope2_market)), NOT(ISNUMBER(current_scope2_market))),
+    AND(NOT(ISBLANK(current_scope2_location)), NOT(ISNUMBER(current_scope2_location)))
+  ),
+  
+  has_scope3_string, OR(
+    AND(NOT(ISBLANK(current_scope3_cat1)), NOT(ISNUMBER(current_scope3_cat1))),
+    AND(NOT(ISBLANK(current_scope3_cat2)), NOT(ISNUMBER(current_scope3_cat2))),
+    AND(NOT(ISBLANK(current_scope3_cat3)), NOT(ISNUMBER(current_scope3_cat3))),
+    AND(NOT(ISBLANK(current_scope3_cat4)), NOT(ISNUMBER(current_scope3_cat4))),
+    AND(NOT(ISBLANK(current_scope3_cat5)), NOT(ISNUMBER(current_scope3_cat5))),
+    AND(NOT(ISBLANK(current_scope3_cat6)), NOT(ISNUMBER(current_scope3_cat6))),
+    AND(NOT(ISBLANK(current_scope3_cat7)), NOT(ISNUMBER(current_scope3_cat7))),
+    AND(NOT(ISBLANK(current_scope3_cat8)), NOT(ISNUMBER(current_scope3_cat8)))
+  ),
+  
+  completed_scope1, IF(has_scope1_string, "",
+                      IF(ISNUMBER(current_scope1), current_scope1 * 1000, 
+                        IF(AND(ISNUMBER(avg_scope1), current_revenue >= 0), avg_scope1 * current_revenue, 0))),
+  
+  completed_scope2, IF(has_scope2_string, "",
+                      IF(ISNUMBER(current_scope2_market), current_scope2_market * 1000,
+                        IF(ISNUMBER(current_scope2_location), current_scope2_location * 1000,
+                          IF(AND(ISNUMBER(avg_scope2), current_revenue >= 0), avg_scope2 * current_revenue, 0)))),
+  
+  completed_scope3_cat1, IF(ISNUMBER(current_scope3_cat1), current_scope3_cat1 * 1000, 
+                           IF(ISNUMBER(avg_scope3_cat1), 
+                             IF(office_based_category, 
+                               IF(has_valid_employees, avg_scope3_cat1 * current_employees, ""), 
+                               IF(current_revenue >= 0, avg_scope3_cat1 * current_revenue, 0)), 
+                             "")),
+  
+  completed_scope3_cat2, IF(ISNUMBER(current_scope3_cat2), current_scope3_cat2 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat2), current_revenue >= 0), avg_scope3_cat2 * current_revenue, "")),
+  
+  completed_scope3_cat3, IF(ISNUMBER(current_scope3_cat3), current_scope3_cat3 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat3), current_revenue >= 0), avg_scope3_cat3 * current_revenue, "")),
+  
+  completed_scope3_cat4, IF(ISNUMBER(current_scope3_cat4), current_scope3_cat4 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat4), current_revenue >= 0), avg_scope3_cat4 * current_revenue, "")),
+  
+  completed_scope3_cat5, IF(ISNUMBER(current_scope3_cat5), current_scope3_cat5 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat5), has_valid_employees), avg_scope3_cat5 * current_employees, "")),
+  
+  completed_scope3_cat6, IF(ISNUMBER(current_scope3_cat6), current_scope3_cat6 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat6), has_valid_employees), avg_scope3_cat6 * current_employees, "")),
+  
+  completed_scope3_cat7, IF(ISNUMBER(current_scope3_cat7), current_scope3_cat7 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat7), has_valid_employees), avg_scope3_cat7 * current_employees, "")),
+  
+  completed_scope3_cat8, IF(ISNUMBER(current_scope3_cat8), current_scope3_cat8 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat8), current_revenue >= 0), avg_scope3_cat8 * current_revenue, "")),
+  
   total_completed_emissions, 
     (IF(ISNUMBER(completed_scope1), completed_scope1, 0)) +
     (IF(ISNUMBER(completed_scope2), completed_scope2, 0)) +
@@ -116,87 +148,254 @@
     (IF(ISNUMBER(completed_scope3_cat7), completed_scope3_cat7, 0)) +
     (IF(ISNUMBER(completed_scope3_cat8), completed_scope3_cat8, 0)),
   
-  // Return completed emissions per dollar
-  IF(AND(ISNUMBER(current_revenue), current_revenue > 0), 
-    total_completed_emissions / current_revenue, 
+  has_sufficient_data, NOT(OR(
+    completed_scope3_cat1 = "",
+    completed_scope3_cat2 = "",
+    completed_scope3_cat3 = "",
+    completed_scope3_cat4 = "",
+    completed_scope3_cat5 = "",
+    completed_scope3_cat6 = "",
+    completed_scope3_cat7 = "",
+    completed_scope3_cat8 = "",
+  )),
+  
+  IF(AND(ISNUMBER(current_revenue), current_revenue >= 0), 
+    IF(has_sufficient_data, 
+      IF(current_revenue = 0, 
+        "Revenue is zero - cannot calculate per dollar", 
+        (total_completed_emissions / current_revenue)), 
+      ""), 
     "Invalid Revenue")
 )
 
-// ALTERNATIVE SIMPLIFIED FORMULA (if LET function not available)
-// Place this in a new column for Completed Emissions Per Dollar:
-=IF(AND(ISNUMBER(G2), G2>0), 
-  (IF(AND(ISNUMBER(J2), J2>0), J2, 
-    IF(ISNUMBER(INDEX(Industry_Averages!D:D, MATCH(1, (Industry_Averages!A:A = IF(REGEXMATCH(AE2, "Cement"), "Cement", IF(REGEXMATCH(AE2, "Agriculture"), "Agriculture", "Other"))) * (Industry_Averages!B:B = IF(G2<=10000000, "0-10M", IF(G2<=100000000, "10M-100M", IF(G2<=1000000000, "100M-1B", "1B+")))) * (Industry_Averages!C:C = IF(H2<=100, "0-100", IF(H2<=1000, "100-1000", IF(H2<=10000, "1000-10000", "10000+")))), 0))), 
-      INDEX(Industry_Averages!D:D, MATCH(1, (Industry_Averages!A:A = IF(REGEXMATCH(AE2, "Cement"), "Cement", IF(REGEXMATCH(AE2, "Agriculture"), "Agriculture", "Other"))) * (Industry_Averages!B:B = IF(G2<=10000000, "0-10M", IF(G2<=100000000, "10M-100M", IF(G2<=1000000000, "100M-1B", "1B+")))) * (Industry_Averages!C:C = IF(H2<=100, "0-100", IF(H2<=1000, "100-1000", IF(H2<=10000, "1000-10000", "10000+")))), 0)) * G2, 0)) +
-   IF(AND(ISNUMBER(L2), L2>0), L2, IF(AND(ISNUMBER(K2), K2>0), K2, 0)) +
-   (N2:U2 values with similar average substitution logic)
-  ) / G2, 
-  "Invalid Revenue")
-
-// HELPER FORMULAS FOR BREAKDOWN ANALYSIS:
-
-// 1. INDUSTRY CLASSIFICATION (Place in new column)
-=IF(OR(REGEXMATCH(AE2, "Cement"), REGEXMATCH(AE2, "Clinker"), REGEXMATCH(AE2, "Concrete")), "Cement",
- IF(OR(REGEXMATCH(AE2, "Paddy rice"), REGEXMATCH(AE2, "Wheat"), REGEXMATCH(AE2, "Crops"), REGEXMATCH(AE2, "Cattle")), "Agriculture",
- IF(OR(REGEXMATCH(AE2, "machinery"), REGEXMATCH(AE2, "Capital Goods")), "Capital Goods",
- IF(OR(REGEXMATCH(AE2, "Chemicals"), REGEXMATCH(AE2, "Plastics")), "Chemicals",
- IF(OR(REGEXMATCH(AE2, "Coal"), REGEXMATCH(AE2, "Lignite")), "Coal",
- IF(REGEXMATCH(AE2, "Construction"), "Construction",
- IF(REGEXMATCH(AE2, "Electricity"), "Electric Utilities",
- IF(REGEXMATCH(AE2, "Financial"), "Financial Services",
- IF(OR(REGEXMATCH(AE2, "Food"), REGEXMATCH(AE2, "Beverages")), "Food & Beverage",
- IF(OR(REGEXMATCH(AE2, "Iron ores"), REGEXMATCH(AE2, "mining")), "Mining",
- IF(OR(REGEXMATCH(AE2, "Basic iron"), REGEXMATCH(AE2, "steel")), "Metals Processing",
- IF(OR(REGEXMATCH(AE2, "Crude petroleum"), REGEXMATCH(AE2, "Natural gas")), "Oil and Gas",
- IF(OR(REGEXMATCH(AE2, "forestry"), REGEXMATCH(AE2, "Wood")), "Forestry",
- IF(OR(REGEXMATCH(AE2, "Pulp"), REGEXMATCH(AE2, "Paper")), "Paper",
- IF(REGEXMATCH(AE2, "Real estate"), "Real Estate",
- IF(OR(REGEXMATCH(AE2, "Motor vehicles"), REGEXMATCH(AE2, "transport equipment")), "Transport Manufacturers",
- IF(REGEXMATCH(AE2, "transportation services"), "Transport Services", "Other")))))))))))))))))
-
-// 2. REVENUE BAND (Place in new column)
-=IF(G2<=10000000, "0-10M", IF(G2<=100000000, "10M-100M", IF(G2<=1000000000, "100M-1B", "1B+")))
-
-// 3. EMPLOYEE BAND (Place in new column) 
-=IF(H2<=100, "0-100", IF(H2<=1000, "100-1000", IF(H2<=10000, "1000-10000", "10000+")))
-
-// 4. MISSING DATA INDICATOR (Place in new column)
-=CONCATENATE(
-  IF(OR(ISBLANK(J2), J2=0, J2=""), "Scope1 ", ""),
-  IF(OR(AND(ISBLANK(K2), ISBLANK(L2)), AND(K2=0, L2=0), AND(K2="", L2="")), "Scope2 ", ""),
-  IF(OR(ISBLANK(N2), N2=0, N2=""), "S3-Cat1 ", ""),
-  IF(OR(ISBLANK(O2), O2=0, O2=""), "S3-Cat2 ", ""),
-  IF(OR(ISBLANK(P2), P2=0, P2=""), "S3-Cat3 ", ""),
-  IF(OR(ISBLANK(Q2), Q2=0, Q2=""), "S3-Cat4 ", ""),
-  IF(OR(ISBLANK(R2), R2=0, R2=""), "S3-Cat5 ", ""),
-  IF(OR(ISBLANK(S2), S2=0, S2=""), "S3-Cat6 ", ""),
-  IF(OR(ISBLANK(T2), T2=0, T2=""), "S3-Cat7 ", ""),
-  IF(OR(ISBLANK(U2), U2=0, U2=""), "S3-Cat8 ", "")
-)
-
-// 5. DATA COMPLETION PERCENTAGE (Place in new column)
-=ROUND((10 - LEN(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(
+// BREAKDOWN FORMULA
+=LET(
+  current_revenue, F10,
+  current_employees, H10,
+  current_category, AE10,
+  current_scope1, J10,
+  current_scope2_location, K10,
+  current_scope2_market, L10,
+  current_scope3_cat1, N10,
+  current_scope3_cat2, O10,
+  current_scope3_cat3, P10,
+  current_scope3_cat4, Q10,
+  current_scope3_cat5, R10,
+  current_scope3_cat6, S10,
+  current_scope3_cat7, T10,
+  current_scope3_cat8, U10,
+  
+  revenue_band, IF(current_revenue <= 50000000, "0-50M", 
+                IF(current_revenue <= 250000000, "50M-250M", 
+                IF(current_revenue <= 1000000000, "250M-1B", "1B+"))),
+  
+  employee_band, IF(current_employees <= 100, "1-100", 
+                 IF(current_employees <= 500, "101-500", 
+                 IF(current_employees <= 2000, "501-2000", "2001+"))),
+  
+  industry, current_category,
+  
+  has_valid_employees, AND(NOT(ISBLANK(current_employees)), ISNUMBER(current_employees), current_employees > 0),
+  
+  specific_match_D, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!D:D, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_D, INDEX(Industry_Averages!D:D, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope1, IF(ISNUMBER(specific_match_D), specific_match_D, IF(ISNUMBER(fallback_match_D), fallback_match_D, "")),
+  
+  specific_match_E, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!E:E, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_E, INDEX(Industry_Averages!E:E, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope2, IF(ISNUMBER(specific_match_E), specific_match_E, IF(ISNUMBER(fallback_match_E), fallback_match_E, "")),
+  
+  specific_match_F, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!F:F, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_F, INDEX(Industry_Averages!F:F, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat1, IF(ISNUMBER(specific_match_F), specific_match_F, IF(ISNUMBER(fallback_match_F), fallback_match_F, "")),
+  
+  specific_match_G, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!G:G, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_G, INDEX(Industry_Averages!G:G, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat2, IF(ISNUMBER(specific_match_G), specific_match_G, IF(ISNUMBER(fallback_match_G), fallback_match_G, "")),
+  
+  specific_match_H, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!H:H, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_H, INDEX(Industry_Averages!H:H, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat3, IF(ISNUMBER(specific_match_H), specific_match_H, IF(ISNUMBER(fallback_match_H), fallback_match_H, "")),
+  
+  specific_match_I, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!I:I, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_I, INDEX(Industry_Averages!I:I, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat4, IF(ISNUMBER(specific_match_I), specific_match_I, IF(ISNUMBER(fallback_match_I), fallback_match_I, "")),
+  
+  specific_match_J, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!J:J, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_J, INDEX(Industry_Averages!J:J, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat5, IF(ISNUMBER(specific_match_J), specific_match_J, IF(ISNUMBER(fallback_match_J), fallback_match_J, "")),
+  
+  specific_match_K, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!K:K, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_K, INDEX(Industry_Averages!K:K, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat6, IF(ISNUMBER(specific_match_K), specific_match_K, IF(ISNUMBER(fallback_match_K), fallback_match_K, "")),
+  
+  specific_match_L, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!L:L, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_L, INDEX(Industry_Averages!L:L, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat7, IF(ISNUMBER(specific_match_L), specific_match_L, IF(ISNUMBER(fallback_match_L), fallback_match_L, "")),
+  
+  specific_match_M, IF(industry = "Financial intermediation services, except insurance and pension funding services", "", INDEX(Industry_Averages!M:M, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = revenue_band) * (Industry_Averages!C:C = employee_band), 0))),
+  fallback_match_M, INDEX(Industry_Averages!M:M, MATCH(1, (Industry_Averages!A:A = industry) * (Industry_Averages!B:B = "ALL_BANDS") * (Industry_Averages!C:C = "ALL_BANDS"), 0)),
+  avg_scope3_cat8, IF(ISNUMBER(specific_match_M), specific_match_M, IF(ISNUMBER(fallback_match_M), fallback_match_M, "")),
+  
+  office_based_category, OR(
+    current_category = "Financial intermediation services, except insurance and pension funding services",
+    current_category = "Insurance and pension funding services, except compulsory social security services", 
+    current_category = "Services auxiliary to financial intermediation",
+    current_category = "Financial services nec",
+    current_category = "Research and development services",
+    current_category = "Public administration and defence services; compulsory social security services",
+    current_category = "Education services",
+    current_category = "Health and social work services",
+    current_category = "Membership organisation services n.e.c.",
+    current_category = "Recreational, cultural and sporting services",
+    current_category = "Other services",
+    current_category = "Supporting and auxiliary transport services; travel agency services"
+  ),
+  
+  has_scope1_string, AND(NOT(ISBLANK(current_scope1)), NOT(ISNUMBER(current_scope1))),
+  
+  has_scope2_string, OR(
+    AND(NOT(ISBLANK(current_scope2_market)), NOT(ISNUMBER(current_scope2_market))),
+    AND(NOT(ISBLANK(current_scope2_location)), NOT(ISNUMBER(current_scope2_location)))
+  ),
+  
+  has_scope3_string, OR(
+    AND(NOT(ISBLANK(current_scope3_cat1)), NOT(ISNUMBER(current_scope3_cat1))),
+    AND(NOT(ISBLANK(current_scope3_cat2)), NOT(ISNUMBER(current_scope3_cat2))),
+    AND(NOT(ISBLANK(current_scope3_cat3)), NOT(ISNUMBER(current_scope3_cat3))),
+    AND(NOT(ISBLANK(current_scope3_cat4)), NOT(ISNUMBER(current_scope3_cat4))),
+    AND(NOT(ISBLANK(current_scope3_cat5)), NOT(ISNUMBER(current_scope3_cat5))),
+    AND(NOT(ISBLANK(current_scope3_cat6)), NOT(ISNUMBER(current_scope3_cat6))),
+    AND(NOT(ISBLANK(current_scope3_cat7)), NOT(ISNUMBER(current_scope3_cat7))),
+    AND(NOT(ISBLANK(current_scope3_cat8)), NOT(ISNUMBER(current_scope3_cat8)))
+  ),
+  
+  completed_scope1, IF(has_scope1_string, "",
+                      IF(ISNUMBER(current_scope1), current_scope1 * 1000, 
+                        IF(AND(ISNUMBER(avg_scope1), current_revenue >= 0), avg_scope1 * current_revenue, 0))),
+  
+  completed_scope2, IF(has_scope2_string, "",
+                      IF(ISNUMBER(current_scope2_market), current_scope2_market * 1000,
+                        IF(ISNUMBER(current_scope2_location), current_scope2_location * 1000,
+                          IF(AND(ISNUMBER(avg_scope2), current_revenue >= 0), avg_scope2 * current_revenue, 0)))),
+  
+  completed_scope3_cat1, IF(ISNUMBER(current_scope3_cat1), current_scope3_cat1 * 1000, 
+                           IF(ISNUMBER(avg_scope3_cat1), 
+                             IF(office_based_category, 
+                               IF(has_valid_employees, avg_scope3_cat1 * current_employees, ""), 
+                               IF(current_revenue >= 0, avg_scope3_cat1 * current_revenue, 0)), 
+                             "")),
+  
+  completed_scope3_cat2, IF(ISNUMBER(current_scope3_cat2), current_scope3_cat2 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat2), current_revenue >= 0), avg_scope3_cat2 * current_revenue, "")),
+  
+  completed_scope3_cat3, IF(ISNUMBER(current_scope3_cat3), current_scope3_cat3 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat3), current_revenue >= 0), avg_scope3_cat3 * current_revenue, "")),
+  
+  completed_scope3_cat4, IF(ISNUMBER(current_scope3_cat4), current_scope3_cat4 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat4), current_revenue >= 0), avg_scope3_cat4 * current_revenue, "")),
+  
+  completed_scope3_cat5, IF(ISNUMBER(current_scope3_cat5), current_scope3_cat5 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat5), has_valid_employees), avg_scope3_cat5 * current_employees, "")),
+  
+  completed_scope3_cat6, IF(ISNUMBER(current_scope3_cat6), current_scope3_cat6 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat6), has_valid_employees), avg_scope3_cat6 * current_employees, "")),
+  
+  completed_scope3_cat7, IF(ISNUMBER(current_scope3_cat7), current_scope3_cat7 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat7), has_valid_employees), avg_scope3_cat7 * current_employees, "")),
+  
+  completed_scope3_cat8, IF(ISNUMBER(current_scope3_cat8), current_scope3_cat8 * 1000, 
+                           IF(AND(ISNUMBER(avg_scope3_cat8), current_revenue >= 0), avg_scope3_cat8 * current_revenue, "")),
+  
+  scope1_can_estimate, AND(
+    ISNUMBER(avg_scope1),
+    ISNUMBER(current_revenue), current_revenue >= 0,
+    NOT(has_scope1_string),
+    OR(ISBLANK(current_scope1), NOT(ISNUMBER(current_scope1)))
+  ),
+  
+  scope2_original, IF(ISNUMBER(current_scope2_market), current_scope2_market, 
+                      IF(ISNUMBER(current_scope2_location), current_scope2_location, "")),
+  scope2_can_estimate, AND(
+    ISNUMBER(avg_scope2),
+    ISNUMBER(current_revenue), current_revenue >= 0,
+    NOT(has_scope2_string),
+    OR(ISBLANK(scope2_original), NOT(ISNUMBER(scope2_original)))
+  ),
+  
+  scope3_cat1_can_estimate, OR(
+    AND(office_based_category, has_valid_employees, ISNUMBER(avg_scope3_cat1)),
+    AND(NOT(office_based_category), ISNUMBER(avg_scope3_cat1), ISNUMBER(current_revenue), current_revenue >= 0)
+  ),
+  
+  scope3_cat2_can_estimate, AND(ISNUMBER(avg_scope3_cat2), ISNUMBER(current_revenue), current_revenue >= 0),
+  scope3_cat3_can_estimate, AND(ISNUMBER(avg_scope3_cat3), ISNUMBER(current_revenue), current_revenue >= 0),
+  scope3_cat4_can_estimate, AND(ISNUMBER(avg_scope3_cat4), ISNUMBER(current_revenue), current_revenue >= 0),
+  scope3_cat5_can_estimate, AND(ISNUMBER(avg_scope3_cat5), has_valid_employees),
+  scope3_cat6_can_estimate, AND(ISNUMBER(avg_scope3_cat6), has_valid_employees),
+  scope3_cat7_can_estimate, AND(ISNUMBER(avg_scope3_cat7), has_valid_employees),
+  scope3_cat8_can_estimate, AND(ISNUMBER(avg_scope3_cat8), ISNUMBER(current_revenue), current_revenue >= 0),
+  
+  scope1_source, IF(AND(NOT(ISBLANK(current_scope1)), ISNUMBER(current_scope1)), 
+                    "[Actual]", 
+                    IF(scope1_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope2_source, IF(AND(NOT(ISBLANK(scope2_original)), ISNUMBER(scope2_original)), 
+                    "[Actual]", 
+                    IF(scope2_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat1_source, IF(AND(NOT(ISBLANK(current_scope3_cat1)), ISNUMBER(current_scope3_cat1)), 
+                         "[Actual]", 
+                         IF(scope3_cat1_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat2_source, IF(AND(NOT(ISBLANK(current_scope3_cat2)), ISNUMBER(current_scope3_cat2)), 
+                         "[Actual]", 
+                         IF(scope3_cat2_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat3_source, IF(AND(NOT(ISBLANK(current_scope3_cat3)), ISNUMBER(current_scope3_cat3)), 
+                         "[Actual]", 
+                         IF(scope3_cat3_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat4_source, IF(AND(NOT(ISBLANK(current_scope3_cat4)), ISNUMBER(current_scope3_cat4)), 
+                         "[Actual]", 
+                         IF(scope3_cat4_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat5_source, IF(AND(NOT(ISBLANK(current_scope3_cat5)), ISNUMBER(current_scope3_cat5)), 
+                         "[Actual]", 
+                         IF(scope3_cat5_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat6_source, IF(AND(NOT(ISBLANK(current_scope3_cat6)), ISNUMBER(current_scope3_cat6)), 
+                         "[Actual]", 
+                         IF(scope3_cat6_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat7_source, IF(AND(NOT(ISBLANK(current_scope3_cat7)), ISNUMBER(current_scope3_cat7)), 
+                         "[Actual]", 
+                         IF(scope3_cat7_can_estimate, "[Estimated]", "[Missing]")),
+  
+  scope3_cat8_source, IF(AND(NOT(ISBLANK(current_scope3_cat8)), ISNUMBER(current_scope3_cat8)), 
+                         "[Actual]", 
+                         IF(scope3_cat8_can_estimate, "[Estimated]", "[Missing]")),
+  
   CONCATENATE(
-    IF(OR(ISBLANK(J2), J2=0, J2=""), "1", ""),
-    IF(OR(AND(ISBLANK(K2), ISBLANK(L2)), AND(K2=0, L2=0), AND(K2="", L2="")), "1", ""),
-    IF(OR(ISBLANK(N2), N2=0, N2=""), "1", ""),
-    IF(OR(ISBLANK(O2), O2=0, O2=""), "1", ""),
-    IF(OR(ISBLANK(P2), P2=0, P2=""), "1", ""),
-    IF(OR(ISBLANK(Q2), Q2=0, Q2=""), "1", ""),
-    IF(OR(ISBLANK(R2), R2=0, R2=""), "1", ""),
-    IF(OR(ISBLANK(S2), S2=0, S2=""), "1", ""),
-    IF(OR(ISBLANK(T2), T2=0, T2=""), "1", ""),
-    IF(OR(ISBLANK(U2), U2=0, U2=""), "1", "")
-  ), "1", ""), "1", ""), "1", ""), "1", ""), "1", ""), "1", ""), "1", ""), "1", ""), "1", ""), "1", "")) / 10 * 100, 1) & "%"
-
-// IMPORTANT: HANDLING STRING VALUES
-// The updated formulas now preserve existing data whether it's numbers or text strings
-// Logic: Keep data if NOT(ISBLANK) AND <> 0 AND <> "" (preserves numbers and text)
-// Only fills missing data: blank cells, zeros, or empty strings
-// Mathematical totals only include numerical values for proper calculation
-
-// INSTRUCTIONS FOR SETUP:
-// 1. Create "Industry_Averages" sheet with benchmark data
-// 2. Add these formulas to new columns in your main data sheet
-// 3. Use the main LET formula for the completed emissions per dollar calculation
-// 4. Use helper formulas for analysis and verification 
+    "S1: ", IF(ISNUMBER(completed_scope1), ROUND(completed_scope1, 2), "N/A"), 
+    " ", scope1_source, " | ",
+    "S2: ", IF(ISNUMBER(completed_scope2), ROUND(completed_scope2, 2), "N/A"), 
+    " ", scope2_source, " | ",
+    "S3-1: ", IF(ISNUMBER(completed_scope3_cat1), ROUND(completed_scope3_cat1, 2), "N/A"), 
+    " ", scope3_cat1_source, " | ",
+    "S3-2: ", IF(ISNUMBER(completed_scope3_cat2), ROUND(completed_scope3_cat2, 2), "N/A"), 
+    " ", scope3_cat2_source, " | ",
+    "S3-3: ", IF(ISNUMBER(completed_scope3_cat3), ROUND(completed_scope3_cat3, 2), "N/A"), 
+    " ", scope3_cat3_source, " | ",
+    "S3-4: ", IF(ISNUMBER(completed_scope3_cat4), ROUND(completed_scope3_cat4, 2), "N/A"), 
+    " ", scope3_cat4_source, " | ",
+    "S3-5: ", IF(ISNUMBER(completed_scope3_cat5), ROUND(completed_scope3_cat5, 2), "N/A"), 
+    " ", scope3_cat5_source, " | ",
+    "S3-6: ", IF(ISNUMBER(completed_scope3_cat6), ROUND(completed_scope3_cat6, 2), "N/A"), 
+    " ", scope3_cat6_source, " | ",
+    "S3-7: ", IF(ISNUMBER(completed_scope3_cat7), ROUND(completed_scope3_cat7, 2), "N/A"), 
+    " ", scope3_cat7_source, " | ",
+    "S3-8: ", IF(ISNUMBER(completed_scope3_cat8), ROUND(completed_scope3_cat8, 2), "N/A"), 
+    " ", scope3_cat8_source
+  )
+)

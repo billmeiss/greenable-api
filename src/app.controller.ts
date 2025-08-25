@@ -124,6 +124,13 @@ export class AppController {
     return this.appService.createIndustryAveragesSheet();
   }
 
+  @Post('/validate-data-quality')
+  validateDataQuality(
+    @Body() options: { fromRow?: number; toRow?: number } = {}
+  ) {
+    return this.appService.validateCompaniesDataQuality(options);
+  }
+
   @Post('/fix-revenue-source-errors')
   fixRevenueSourceErrors() {
     return this.appService.fixRevenueSourceErrors();

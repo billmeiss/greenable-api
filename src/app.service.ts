@@ -85,9 +85,14 @@ export class AppService {
   }
 
   async updateCountries(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet();
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10700 });
     for (const company of companies) {
-      const { name, reportUrl } = company;
+      const { name, reportUrl, country: existingCountry } = company;
+
+      if (existingCountry) {
+        continue;
+      }
+
       const { country } = await this.companyService.determineCompanyCountry(name, reportUrl);
       await this.companyService.updateCompanyCountry(name, country);
     }
@@ -242,7 +247,7 @@ export class AppService {
   }
 
   async updateMissingEmployees(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 10600, toRow: 10700 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 1, toRow: 10700 });
     
     if (companies.length === 0) {
       this.logger.log('No companies found for employee count update');
@@ -261,30 +266,41 @@ export class AppService {
     let failedUpdates = 0;
     
     // Process companies in batches to avoid overwhelming the system
-    const batchSize = 7;
+    const batchSize = 1;
     for (let i = 0; i < companies.length; i += batchSize) {
       const batch = companies.slice(i, i + batchSize);
       
       const batchPromises = batch.map(async (company) => {
         try {
           const { name, reportUrl, reportingPeriod, revenueUrl, employeeCount } = company;
-          if (Number(employeeCount) > 0) {
-            return;
-          }
+    
 
           // if there's an error catch it and continue the flow
           let result;
-          try {
-            result = await this.companyService.checkReportUrlForMissingEmployees(name, reportUrl, reportingPeriod);
-          } catch (error) {
-            console.log(`[ERROR] Failed to check report url for missing employees for ${name}: ${error.message}`);
-            return;
-          }
           
-          console.log(result);
+            try {
+              // 2) Fallback: process the report URL via upload/conversion
+              result = await this.companyService.checkReportUrlForMissingEmployees(name, reportUrl, reportingPeriod);
+            } catch (error) {
+              console.log(`[ERROR] Failed to check report url for missing employees for ${name}: ${error.message}`);
+            }
           
           if (!result?.employeeCount) {
-              result = await this.companyService.checkReportUrlForMissingEmployees(name, revenueUrl, reportingPeriod);
+          try {
+            // 1) Try text-only prompt with report URL for context (no upload)
+            result = await this.companyService.getEmployeeCountFromPrompt(name, reportUrl, reportingPeriod);
+          } catch (error) {
+            console.log(`[ERROR] Prompting Gemini for employee count failed for ${name}: ${error.message}`);
+          }
+            }
+          
+          if (!result?.employeeCount && revenueUrl) {
+            // 3) Final fallback: try with revenueUrl as before
+            result = await this.companyService.checkReportUrlForMissingEmployees(name, revenueUrl, reportingPeriod);
+          }
+          
+          if (!result?.employeeCount) {
+            return;
           }
           
           await this.companyService.updateMissingEmployees(name, result.employeeCount, company);
@@ -497,10 +513,10 @@ export class AppService {
   }
 
   async checkExistingReports(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 1585 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 20, toRow: 263 });
     
     // Process companies in batches of 3
-    const batchSize = 9;
+    const batchSize = 1;
     for (let i = 0; i < companies.length; i += batchSize) {
       const batch = companies.slice(i, i + batchSize);
       
@@ -797,6 +813,24 @@ export class AppService {
         error: error.message,
         message: 'Failed to create industry averages sheet'
       };
+    }
+  }
+
+  /**
+   * Validate data quality using companies from the sheet
+   * - Missing categories
+   * - Duplicate revenues (by company and revenue year)
+   * - Negative emission values or revenues
+   */
+  async validateCompaniesDataQuality(options: { fromRow?: number; toRow?: number } = {}): Promise<any> {
+    try {
+      this.logger.log('Starting companies data quality validation');
+      const result = await this.companyService.validateCompaniesDataQuality(options);
+      this.logger.log(`Data quality validation completed: ${JSON.stringify(result.counts)}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error validating companies data quality: ${error.message}`);
+      return { success: false, error: error.message };
     }
   }
 
