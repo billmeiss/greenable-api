@@ -513,7 +513,7 @@ export class AppService {
   }
 
   async checkExistingReports(): Promise<any> {
-    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 20, toRow: 263 });
+    const companies = await this.companyService.getExistingCompaniesFromSheet({ fromRow: 1, toRow: 263 });
     
     // Process companies in batches of 3
     const batchSize = 1;
