@@ -2447,7 +2447,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Find the company row
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `Analysed Data!A${fromRow}:AZ`
+        `Mycelium_Check!A${fromRow}:AZ`
       );
 
       const rows = data.values || [];
@@ -2462,7 +2462,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       const actualRowNumber = fromRow + companyIndex;
 
       // Get notes from column AU (index 46, 0-based)
-      const notes = rows[companyIndex][48]; // Column AY
+      const notes = rows[companyIndex][50]; // Column AY
       
       if (!notes) {
         console.log(`[INFO] No notes found in column AU for ${companyName}`);
@@ -2527,7 +2527,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       try {
         await this.sheetsApiService.updateValues(
           this.SPREADSHEET_ID,
-          `Analysed Data!AX${actualRowNumber}`,
+          `Mycelium_Check!AZ${actualRowNumber}`,
           [['Checked and Updated']]
         );
         console.log(`[SUCCESS] Marked ${companyName} as checked and updated`);
@@ -2563,7 +2563,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Analysed Data'!A${fromRow}:AZ`
+        `'Mycelium_Check'!A${fromRow}:AZ`
       );
       
       const rows = data.values || [];
@@ -2572,8 +2572,8 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const companyName = row[0];
-        const notes = row[48]; // Column AY (0-indexed as 50)
-        const processedFlag = row[49]; // Column AZ (0-indexed as 51)
+        const notes = row[50]; // Column AY (0-indexed as 50)
+        const processedFlag = row[51]; // Column AZ (0-indexed as 51)
         
         // Check if company has notes in AU but hasn't been processed (AV is not "Checked and Updated")
         if (companyName && notes && 

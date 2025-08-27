@@ -586,7 +586,7 @@ export class AppService {
   /**
    * Update checked reports for all companies that have unchecked reports
    */
-  async updateAllCheckedReports(fromRow: number = 5521): Promise<any> {
+  async updateAllCheckedReports(fromRow: number = 1): Promise<any> {
     try {
       this.logger.log(`Starting bulk update of all checked reports from row ${fromRow}`);
       

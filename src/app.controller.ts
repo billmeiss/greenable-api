@@ -71,8 +71,6 @@ export class AppController {
     return this.appService.checkIncompleteScopes();
   }  
 
-  
-
   @Post('/check-existing-reports')
   checkExistingReports() {
     return this.appService.checkExistingReports();
@@ -94,7 +92,7 @@ export class AppController {
 
   @Post('/update-all-checked-reports')
   updateAllCheckedReports(@Body() body?: { fromRow?: number }) {
-    const fromRow = body?.fromRow || 5500; // Default to 5521, but allow override
+    const fromRow = body?.fromRow || 1; // Default to 5521, but allow override
     return this.appService.updateAllCheckedReports(fromRow);
   }
 
