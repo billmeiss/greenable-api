@@ -2334,7 +2334,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     if (incorrectEmissions && incorrectEmissions.length > 0) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Mycelium_Check!AY${companyIndex + 2}:AZ${companyIndex + 2}`,
+        `Mycelium_Check!BA${companyIndex + 2}:BB${companyIndex + 2}`,
         [[incorrectEmissions.map(emission => `${emission.companyName} - ${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason} --- ${emission.confidence})`).join('\n'), 'Not checked or updated']]
       );
     }
@@ -2509,7 +2509,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
           // Update the cell with correct row calculation
           await this.sheetsApiService.updateValues(
             this.SPREADSHEET_ID,
-            `Analysed Data!${columnLetter}${actualRowNumber}`,
+            `Mycelium_Check!${columnLetter}${actualRowNumber}`,
             [[valueToUpdate]]
           );
 
