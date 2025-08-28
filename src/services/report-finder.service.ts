@@ -247,25 +247,32 @@ export class ReportFinderService {
       
       try {
         // If it's a PDF, process directly
-        if (url.toLowerCase().includes('.pdf') && withEmissions) {
-          const validationResult = await this.emissionsReportService.validateAndExtractReportData(
-            url, 
-            company, 
-            expectedYear, 
-          );
-          
-          if (validationResult) {
-            // Check if this result contains emissions data
-            if (validationResult && validationResult.emissions) {
-              // Handle the timeout case - if timedOut is true, immediately return to skip to next company
-              if (validationResult.emissions.timedOut) {
-                this.logger.warn(`TIMEOUT: Emissions extraction for ${company} exceeded 5 minutes.`);
-                this.logger.warn(`Report URL: ${validationResult.reportUrl}`);
-                console.log(`[SKIP] Skipping company ${company} due to timeout and moving to next company`);
-                return validationResult; // Return the result with timeout information
+        const isPdfUrl = url.toLowerCase().endsWith('.pdf') || url.toLowerCase().includes('.pdf');
+        if (isPdfUrl) {
+          if (withEmissions) {
+            const validationResult = await this.emissionsReportService.validateAndExtractReportData(
+              url, 
+              company, 
+              expectedYear, 
+            );
+            
+            if (validationResult) {
+              // Check if this result contains emissions data
+              if (validationResult && validationResult.emissions) {
+                // Handle the timeout case - if timedOut is true, immediately return to skip to next company
+                if (validationResult.emissions.timedOut) {
+                  this.logger.warn(`TIMEOUT: Emissions extraction for ${company} exceeded 5 minutes.`);
+                  this.logger.warn(`Report URL: ${validationResult.reportUrl}`);
+                  console.log(`[SKIP] Skipping company ${company} due to timeout and moving to next company`);
+                  return validationResult; // Return the result with timeout information
+                }
               }
+              return validationResult;
             }
-            return validationResult;
+          } else {
+            // If withEmissions is false, just return the PDF URL without processing
+            console.log(`[INFO] Found direct PDF URL for ${company}: ${url}`);
+            return { emissions: null, reportUrl: url };
           }
         } else {
           // If it's a webpage, look for PDF links
@@ -310,11 +317,11 @@ export class ReportFinderService {
   }
 
   async verifyCorrectReportWithGemini(reportUrls: string[], company: string): Promise<any> {
-    const existingCompanies = await this.companyService.getExistingCompaniesFromSheet();
+    // const existingCompanies = await this.companyService.getExistingCompaniesFromSheet();
 
-    const companiesToExclude = [...existingCompanies.map(company => company.name)];
+    // const companiesToExclude = [...existingCompanies.map(company => company.name)];
 
-    console.log(companiesToExclude)
+    // console.log(companiesToExclude)
  
     const reportFinderModel = this.geminiModelService.getModel('reportFinder');
       
@@ -386,15 +393,15 @@ export class ReportFinderService {
     try {
       const parsedResponse = await this.verifyCorrectReportWithGemini(reportUrls, company);
       console.log(parsedResponse)
-      let doesFirstUrlExist = false;
+      const doesFirstUrlExist = true;
 
-      if (parsedResponse.firstReportCompany) {
+      if (parsedResponse?.firstReportCompany) {
         try {
-          const companyExists = await this.companyService.doesCompanyExist(parsedResponse.firstReportCompany);
-          doesFirstUrlExist = companyExists?.exists || false;
+          // const companyExists = await this.companyService.doesCompanyExist(parsedResponse.firstReportCompany);
+          // doesFirstUrlExist = companyExists?.exists || false;
         } catch (error) {
           console.log(`[ERROR] Error checking if first report company exists for ${parsedResponse.firstReportCompany}: ${error.message}`);
-          doesFirstUrlExist = false;
+          // doesFirstUrlExist = false;
         }
       }
       
