@@ -164,5 +164,27 @@ export class AppController {
     return this.appService.compareCompanyNamesBetweenSheets();
   }
 
+  /**
+   * Check ESG report availability for companies from sheet without extracting emissions data
+   * This is a cost-efficient endpoint that only checks metadata and report URLs
+   * @param options Configuration options for the process
+   * @param options.fromRow Start row number in the spreadsheet (optional, default: 1)
+   * @param options.toRow End row number in the spreadsheet (optional)
+   * @param options.batchSize Number of companies to process in parallel (default: 3)
+   * @param options.targetYear Target year for reports (optional, default: 2023)
+   * @returns Summary of report availability check results
+   */
+  @Post('/check-report-availability')
+  checkESGReportAvailability(
+    @Body() options: {
+      fromRow?: number;
+      toRow?: number;
+      batchSize?: number;
+      targetYear?: number;
+    } = {}
+  ) {
+    return this.appService.checkESGReportAvailability(options);
+  }
+
   
 }

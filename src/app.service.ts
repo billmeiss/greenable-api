@@ -1035,6 +1035,252 @@ export class AppService {
       };
     }
   }
+
+  /**
+   * Check ESG report availability for companies from sheet without extracting emissions data
+   * This is a cost-efficient method that only checks metadata and report URLs
+   */
+  async checkESGReportAvailability(options: {
+    fromRow?: number;
+    toRow?: number;
+    batchSize?: number;
+    targetYear?: number;
+  } = {}): Promise<any> {
+    const { 
+      fromRow = 1, 
+      toRow, 
+      batchSize = 3, 
+      targetYear = 2024
+    } = options;
+    
+    this.logger.log(`Starting ESG report availability check from row ${fromRow}${toRow ? ` to ${toRow}` : ''}`);
+    this.logger.log(`Batch size: ${batchSize}, Target year: ${targetYear}`);
+    
+    try {
+      // Get companies from the "Companies to Request" sheet
+      const companies = await this.companyService.getCompaniesFromSheet();
+      
+      if (!companies || companies.length === 0) {
+        return {
+          success: false,
+          message: 'No companies found in spreadsheet',
+          totalCompanies: 0,
+          processedCompanies: 0,
+          successfulFinds: 0,
+          skippedCompanies: 0,
+          errors: ['No companies found']
+        };
+      }
+
+      // Filter companies based on row range
+      const startIndex = Math.max(0, fromRow - 1);
+      const endIndex = toRow ? Math.min(companies.length, toRow) : companies.length;
+      const companiesToProcess = companies.slice(startIndex, endIndex);
+      
+      this.logger.log(`Processing ${companiesToProcess.length} companies from total ${companies.length}`);
+      
+      const results = {
+        success: true,
+        totalCompanies: companies.length,
+        processedCompanies: 0,
+        successfulFinds: 0,
+        failedFinds: 0,
+        skippedCompanies: 0,
+        companiesWithReports: [],
+        companiesWithoutReports: [],
+        skippedCompaniesList: [],
+        errors: [],
+        startTime: new Date(),
+        endTime: null
+      };
+
+      // Get the spreadsheet ID
+      const spreadsheetId = '1s1lwxtJHGg9REPYAXAClF5nA1JiqQt2Jl4Cd08qgXJg';
+
+      // Process companies in batches to avoid overwhelming the API
+      for (let i = 0; i < companiesToProcess.length; i += batchSize) {
+        const batch = companiesToProcess.slice(i, i + batchSize);
+        this.logger.log(`Processing batch ${Math.floor(i / batchSize) + 1}: companies ${i + 1}-${Math.min(i + batchSize, companiesToProcess.length)}`);
+        
+        // Process companies in parallel within each batch
+        const batchPromises = batch.map(async (company) => {
+          try {
+            this.logger.log(`[${company}] Checking if company already exists in Analysed Data sheet`);
+
+            let companyExistsResult;
+            try {
+              companyExistsResult = await this.companyService.doesCompanyExist(company);
+            } catch (error) {
+              console.log(`[ERROR] Failed to check if company exists in Analysed Data sheet: ${error.message} for ${company}`);
+            }
+                        
+            if (companyExistsResult?.exists) {
+              const matchedCompanyName = companyExistsResult.matchedCompany || 'Unknown match';
+              this.logger.log(`[${company}] ⏭️ Company already exists in Analysed Data sheet as "${matchedCompanyName}", skipping`);
+              results.processedCompanies++;
+              results.skippedCompanies++;
+              results.skippedCompaniesList.push(company);
+              
+              // Append skipped result to the Terrascope sheet
+              await this.companyService.appendToTerrascopeSheet(
+                company,
+                '',
+                'Skipped',
+                targetYear,
+                `Company already exists in Analysed Data sheet as "${matchedCompanyName}"`
+              );
+              
+              return; // Skip to next company
+            }
+            
+            this.logger.log(`[${company}] ✓ Company not found in Analysed Data sheet, proceeding with ESG report search`);
+            this.logger.log(`[${company}] Searching for ESG report availability`);
+            
+            // Use the existing findReportDataWithGemini method but without emissions extraction
+            const reportResult = await this.reportFinderService.findReportDataWithGemini(
+              company,
+              targetYear,
+              false, // isHistorical
+              false  // withEmissions = false for cost efficiency
+            );
+
+            let status: string;
+            let reportUrl: string;
+            let reason: string;
+
+            if (reportResult && reportResult.reportUrl) {
+              this.logger.log(`[${company}] ✓ Found ESG report: ${reportResult.reportUrl}`);
+              results.successfulFinds++;
+              status = 'Found';
+              reportUrl = reportResult.reportUrl;
+              reason = '';
+              results.companiesWithReports.push({
+                company,
+                reportUrl: reportResult.reportUrl,
+                foundAt: new Date().toISOString(),
+                targetYear,
+                status: 'Found'
+              });
+            } else {
+              this.logger.log(`[${company}] ✗ No ESG report found`);
+              results.failedFinds++;
+              status = 'Not Found';
+              reportUrl = '';
+              reason = 'No valid ESG report found';
+              results.companiesWithoutReports.push({
+                company,
+                reportUrl: '',
+                foundAt: new Date().toISOString(),
+                targetYear,
+                status: 'Not Found',
+                reason: 'No valid ESG report found'
+              });
+            }
+
+            // Append this result to the Terrascope sheet immediately
+            await this.companyService.appendToTerrascopeSheet(
+              company,
+              reportUrl,
+              status,
+              targetYear,
+              reason
+            );
+
+            results.processedCompanies++;
+            
+          } catch (error) {
+            this.logger.error(`[${company}] Error checking report availability: ${error.message}`);
+            results.errors.push(`${company}: ${error.message}`);
+            results.failedFinds++;
+            
+            const errorReason = `Error: ${error.message}`;
+            results.companiesWithoutReports.push({
+              company,
+              reportUrl: '',
+              foundAt: new Date().toISOString(),
+              targetYear,
+              status: 'Error',
+              reason: errorReason
+            });
+
+            // Append error result to the Terrascope sheet
+            try {
+              await this.companyService.appendToTerrascopeSheet(
+                company,
+                '',
+                'Error',
+                targetYear,
+                errorReason
+              );
+            } catch (appendError) {
+              this.logger.error(`[${company}] Failed to append error result to sheet: ${appendError.message}`);
+            }
+
+            results.processedCompanies++;
+          }
+        });
+
+        // Wait for all companies in this batch to complete
+        await Promise.all(batchPromises);
+        
+        // Add a small delay between batches to be respectful to APIs
+        if (i + batchSize < companiesToProcess.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        }
+      }
+
+      results.endTime = new Date();
+      const duration = (results.endTime.getTime() - results.startTime.getTime()) / 1000;
+      
+      this.logger.log(`ESG report availability check completed in ${duration}s`);
+      this.logger.log(`Results: ${results.successfulFinds} found, ${results.failedFinds} not found, ${results.skippedCompanies} skipped (already exist), ${results.errors.length} errors`);
+      
+      return {
+        ...results,
+        duration: `${duration}s`,
+        successRate: results.processedCompanies > 0 ? 
+          `${((results.successfulFinds / (results.processedCompanies - results.skippedCompanies)) * 100).toFixed(1)}%` : '0%',
+        outputSheet: 'Terrascope',
+        message: `Results appended to Terrascope sheet: ${results.successfulFinds} reports found, ${results.failedFinds} not found, ${results.skippedCompanies} companies skipped (already in Analysed Data)`
+      };
+      
+    } catch (error) {
+      this.logger.error(`Error in ESG report availability check: ${error.message}`);
+      return {
+        success: false,
+        message: `Error checking ESG report availability: ${error.message}`,
+        totalCompanies: 0,
+        processedCompanies: 0,
+        successfulFinds: 0,
+        failedFinds: 0,
+        skippedCompanies: 0,
+        companiesWithReports: [],
+        companiesWithoutReports: [],
+        skippedCompaniesList: [],
+        errors: [error.message],
+        duration: '0s',
+        successRate: '0%'
+      };
+    }
+  }
+
+  /**
+   * Append a single result row to the existing Terrascope sheet
+   */
+
+
+  /**
+   * Helper method to convert column number to letter (A, B, C, etc.)
+   */
+  private getColumnLetter(columnNumber: number): string {
+    let result = '';
+    while (columnNumber > 0) {
+      columnNumber--;
+      result = String.fromCharCode(65 + (columnNumber % 26)) + result;
+      columnNumber = Math.floor(columnNumber / 26);
+    }
+    return result;
+  }
 }
 
 

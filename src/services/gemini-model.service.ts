@@ -27,17 +27,6 @@ export class GeminiModelService {
       },
     }
 
-    this.modelConfigs.companyNameChecker = {
-      model: 'gemini-2.5-flash-lite',
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
-      systemInstruction: `You will return responses in this JSON format:
-        {
-          "exists": boolean
-        }`
-    };
-
     this.modelConfigs.companyCategory = {
       model: 'gemini-2.5-flash-lite',
       generationConfig: {
@@ -757,7 +746,7 @@ You will return responses in this JSON format:
     }
 
     this.modelConfigs.companyNameChecker = {
-      model: 'gemini-2.5-pro',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.0,
         responseMimeType: 'application/json',

@@ -389,7 +389,13 @@ export class ReportFinderService {
       let doesFirstUrlExist = false;
 
       if (parsedResponse.firstReportCompany) {
-        doesFirstUrlExist = await this.companyService.doesCompanyExist(parsedResponse.firstReportCompany);
+        try {
+          const companyExists = await this.companyService.doesCompanyExist(parsedResponse.firstReportCompany);
+          doesFirstUrlExist = companyExists?.exists || false;
+        } catch (error) {
+          console.log(`[ERROR] Error checking if first report company exists for ${parsedResponse.firstReportCompany}: ${error.message}`);
+          doesFirstUrlExist = false;
+        }
       }
       
       if (!parsedResponse) {
@@ -407,10 +413,16 @@ export class ReportFinderService {
         return doesFirstUrlExist ? null : reportUrls[0];
       }
 
-      const doesCompanyExist = await this.companyService.doesCompanyExist(parsedResponse.companyName);
+      try {
+        const companyExistsResult = await this.companyService.doesCompanyExist(parsedResponse.companyName);
 
-      if (doesCompanyExist) {
-        return doesFirstUrlExist ? null : reportUrls[0];
+        if (companyExistsResult?.exists) {
+          console.log(`[INFO] Company ${parsedResponse.companyName} already exists as ${companyExistsResult.matchedCompany}, using fallback URL`);
+          return doesFirstUrlExist ? null : reportUrls[0];
+        }
+      } catch (error) {
+        console.log(`[ERROR] Error checking if company exists for ${parsedResponse.companyName}: ${error.message}`);
+        // Continue with normal flow if company existence check fails
       }
       
       // Verify URL exists in our original list

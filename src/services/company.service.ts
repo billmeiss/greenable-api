@@ -147,25 +147,74 @@ export class CompanyService {
     }
   }
 
-  async doesCompanyExist(companyName: string): Promise<boolean> {
-    const existingCompanies = await this.getExistingCompaniesFromSheet();
+  async doesCompanyExist(companyName: string): Promise<{ exists: boolean; matchedCompany?: string }> {
+    try {
+      const existingCompanies = await this.getExistingCompaniesFromSheet({ fromRow: 2, toRow: 10700 });
 
-    const doesCompanyExist = existingCompanies.some(company => this.isSameCompany(company.name, companyName));
+      // Step 1: Use Gemini to find potential matches from the full list
+      const potentialMatches = await this.findPotentialMatchesWithGemini(
+        companyName, 
+        'Unknown', 
+        existingCompanies
+      );
+    
+    if (potentialMatches.length > 0) {
+      try {
+        console.log(`[POTENTIAL] Found ${potentialMatches.length} potential matches for ${companyName}`);
+        
+        // Step 2: Use Gemini to do detailed analysis of each potential match
+        for (const potentialMatch of potentialMatches) {
+          const detailedAnalysis = await this.compareCompaniesWithGemini(
+            companyName, 
+            'Unknown', 
+            potentialMatch.name, 
+            potentialMatch.country
+          );
+          
+          if (detailedAnalysis.isSameCompany) {
+            return { exists: true, matchedCompany: potentialMatch.name };
+          }
+        }
+        return { exists: false };
+      } catch (error) {
+        console.log(`[ERROR] Error in AI-based company matching for ${companyName}: ${error.message}`);
+        // Fallback to the original simple Gemini approach if the sophisticated matching fails
+        try {
+          const result = await this.geminiApiService.handleGeminiCall(
+            () => this.geminiModelService.getModel('companyNameChecker').generateContent({
+              contents: [{ role: 'user', parts: [{ text: `Is ${companyName} already a company in the following list? ${existingCompanies.map(company => company.name).join(', ')}` }] }],
+            })
+          );
 
-    if (doesCompanyExist) {
-      return true;
+          const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
+          
+          if (parsedResponse.exists) {
+            // Try to find which company it matched by doing a simple search
+            const fallbackMatch = existingCompanies.find(company => 
+              company.name.toLowerCase().includes(companyName.toLowerCase()) ||
+              companyName.toLowerCase().includes(company.name.toLowerCase())
+            );
+            
+            return { 
+              exists: true, 
+              matchedCompany: fallbackMatch ? fallbackMatch.name : 'Unknown match from fallback method'
+            };
+          }
+          
+          return { exists: false };
+        } catch (fallbackError) {
+          console.log(`[ERROR] Fallback matching also failed for ${companyName}: ${fallbackError.message}`);
+          return { exists: false };
+        }
+      }
     }
-
-    // call gemini to check if companyName is in existingCompanies
-    const result = await this.geminiApiService.handleGeminiCall(
-      () => this.geminiModelService.getModel('companyNameChecker').generateContent({
-        contents: [{ role: 'user', parts: [{ text: `Is ${companyName} already a company in the following list? ${existingCompanies.map(company => company.name).join(', ')}` }] }],
-      })
-    );
-
-    const parsedResponse = this.geminiApiService.safelyParseJson(result.text);
-
-    return parsedResponse.exists;
+    
+    // No potential matches found
+    return { exists: false };
+    } catch (error) {
+      console.log(`[ERROR] Error in doesCompanyExist for ${companyName}: ${error.message}`);
+      return { exists: false };
+    }
   }
 
   /**
@@ -1172,7 +1221,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Extended range to include third party assurance data (columns AF and AG)
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Mycelium_Check'!A${fromRow || 2}:AN${toRow || 5500}`
+        `'Analysed Data'!A${fromRow || 2}:AN${toRow || 5500}`
       );
       
       const rows = data.values || [];
@@ -2326,7 +2375,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
 
     const data = await this.sheetsApiService.getValues(
       this.SPREADSHEET_ID,
-      `Mycelium_Check!A2:E`
+      `Analysed Data!A2:E`
     );
     const rows = data.values || [];
     const companyIndex = rows.findIndex(row => row[0] === company);
@@ -2334,7 +2383,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
     if (incorrectEmissions && incorrectEmissions.length > 0) {
       await this.sheetsApiService.updateValues(
         this.SPREADSHEET_ID,
-        `Mycelium_Check!BA${companyIndex + 2}:BB${companyIndex + 2}`,
+        `Analysed Data!BA${companyIndex + 2}:BB${companyIndex + 2}`,
         [[incorrectEmissions.map(emission => `${emission.companyName} - ${emission.scope}: ${emission.value} -> ${emission.correctValue} ------ (${emission.reason} --- ${emission.confidence})`).join('\n'), 'Not checked or updated']]
       );
     }
@@ -2369,14 +2418,14 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
   async updateCompanyNotes(company: string, notes: string): Promise<any> {
     const data = await this.sheetsApiService.getValues(
       this.SPREADSHEET_ID,
-      `Mycelium_Check!A2:E`
+      `Analysed Data!A2:E`
     );
     const rows = data.values || [];
     const companyIndex = rows.findIndex(row => row[0] === company);
 
     await this.sheetsApiService.updateValues(
       this.SPREADSHEET_ID,
-      `Mycelium_Check!AU${companyIndex + 2}`, 
+      `Analysed Data!AU${companyIndex + 2}`, 
       [[`${notes}`]]
     );
   }
@@ -2447,7 +2496,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       // Find the company row
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `Mycelium_Check!A${fromRow}:AZ`
+        `Analysed Data!A${fromRow}:AZ`
       );
 
       const rows = data.values || [];
@@ -2509,7 +2558,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
           // Update the cell with correct row calculation
           await this.sheetsApiService.updateValues(
             this.SPREADSHEET_ID,
-            `Mycelium_Check!${columnLetter}${actualRowNumber}`,
+            `Analysed Data!${columnLetter}${actualRowNumber}`,
             [[valueToUpdate]]
           );
 
@@ -2527,7 +2576,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       try {
         await this.sheetsApiService.updateValues(
           this.SPREADSHEET_ID,
-          `Mycelium_Check!AZ${actualRowNumber}`,
+          `Analysed Data!AZ${actualRowNumber}`,
           [['Checked and Updated']]
         );
         console.log(`[SUCCESS] Marked ${companyName} as checked and updated`);
@@ -2563,7 +2612,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       
       const data = await this.sheetsApiService.getValues(
         this.SPREADSHEET_ID,
-        `'Mycelium_Check'!A${fromRow}:AZ`
+        `'Analysed Data'!A${fromRow}:AZ`
       );
       
       const rows = data.values || [];
@@ -4716,5 +4765,102 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
       negativeRevenues,
       negativeEmissions,
     };
+  }
+
+  /**
+   * Append ESG report availability results to the Terrascope sheet
+   * Creates the sheet with headers if it doesn't exist
+   */
+  async appendToTerrascopeSheet(
+    companyName: string,
+    reportUrl: string,
+    status: string,
+    targetYear: number,
+    notes: string
+  ): Promise<void> {
+    try {
+      const rowData = [
+        companyName,
+        reportUrl || '',
+        status,
+        targetYear.toString(),
+        notes || '',
+        new Date().toISOString().split('T')[0] // Current date in YYYY-MM-DD format
+      ];
+
+      // Try to append to the Terrascope sheet
+      try {
+        await this.sheetsApiService.appendValues(
+          this.SPREADSHEET_ID,
+          'Terrascope!A:F',
+          [rowData]
+        );
+      } catch (appendError) {
+        // If the sheet doesn't exist, create it first
+        if (appendError.message && (
+          appendError.message.includes('Unable to parse range') ||
+          appendError.message.includes('not found') ||
+          appendError.message.toLowerCase().includes('terrascope')
+        )) {
+          console.log(`[INFO] Terrascope sheet not found, creating it with headers...`);
+          
+          // Create the Terrascope sheet
+          await this.createTerrascopeSheet();
+          
+          // Now try to append the data again
+          await this.sheetsApiService.appendValues(
+            this.SPREADSHEET_ID,
+            'Terrascope!A:F',
+            [rowData]
+          );
+        } else {
+          // Re-throw the error if it's not related to missing sheet
+          throw appendError;
+        }
+      }
+
+      console.log(`[SUCCESS] Appended ${companyName} to Terrascope sheet: ${status}`);
+    } catch (error) {
+      console.log(`[ERROR] Failed to append ${companyName} to Terrascope sheet: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Create the Terrascope sheet with appropriate headers
+   */
+  private async createTerrascopeSheet(): Promise<void> {
+    try {
+      console.log(`[STEP] Creating Terrascope sheet...`);
+      
+      // Create the new sheet
+      await this.sheetsApiService.createSheet(
+        this.SPREADSHEET_ID,
+        'Terrascope',
+        { rowCount: 1000, columnCount: 10 }
+      );
+      
+      // Add headers to the sheet
+      const headers = [
+        'Company Name',
+        'Report URL',
+        'Status',
+        'Target Year',
+        'Notes/Reason',
+        'Date Processed'
+      ];
+      
+      await this.sheetsApiService.updateValues(
+        this.SPREADSHEET_ID,
+        'Terrascope!A1:F1',
+        [headers]
+      );
+      
+      console.log(`[SUCCESS] Created Terrascope sheet with headers`);
+      
+    } catch (error) {
+      console.log(`[ERROR] Failed to create Terrascope sheet: ${error.message}`);
+      throw error;
+    }
   }
 }
