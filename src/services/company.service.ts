@@ -4438,7 +4438,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         }),
         2, // maxRetries
         1000, // initialDelayMs
-        30000 // timeoutMs - shorter timeout since we're processing smaller lists
+        120000 // timeoutMs - shorter timeout since we're processing smaller lists
       );
 
       if (!result) {
@@ -4564,7 +4564,7 @@ Again, verify your final list against the exclusion list to ensure NO overlaps.`
         }),
         2, // maxRetries
         1000, // initialDelayMs
-        30000 // timeoutMs
+        120000 // timeoutMs
       );
 
       if (!result) {
